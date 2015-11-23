@@ -7,6 +7,7 @@ n_hidden = 3
 batch_size = 1
 cell_size = 14
 
+
 # tensors and placeholders
 x = tf.placeholder(tf.float32, name="x", shape=(batch_size,n_inputs,1))
 #w = tf.Variable(tf.random_normal([n_hidden,n_inputs+1,batch_size], name="w"))
@@ -31,16 +32,20 @@ f = tf.sigmoid(tf.batch_matmul(w_f, x_h_concat))
 
 # candidate values
 i = tf.sigmoid(tf.batch_matmul(w_i, x_h_concat))
-c = tf.tanh(tf.batch_matmul(w_c, x_h_concat))
+candidate_c = tf.tanh(tf.batch_matmul(w_c, x_h_concat))
 
 # new cell state
-c = tf.add(tf.mul(f, c_), tf.mul(i, c))
+# forget old values of c
+old_c_to_keep = tf.mul(f, c_)
+# scaled candidate values of c
+new_c_to_keep = tf.mul(i, candidate_c)
+c = tf.add(old_c_to_keep, new_c_to_keep)
 
 # new hidden state
 o = tf.sigmoid(tf.batch_matmul(w_o, x_h_concat))
 h = tf.mul(o, tf.tanh(c))
 
-#def lstm_module(data):
+
 with tf.Session() as sesh:
     data = np.ones((batch_size,n_inputs,1))
     init = tf.initialize_all_variables()
