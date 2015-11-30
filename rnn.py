@@ -22,7 +22,7 @@ class Cell(object):
         self.params = [w_f, w_i, w_c, w_o]
 
 
-    def build_node(self, scope="lstm_cell", x_in, c_in, h_in):
+    def build_node(self, x_in, c_in, h_in, scope="lstm_cell"):
         with tf.variable_scope(scope):
             x_with_h = tf.concat(1, [x_in, h_in])
             x_h_concat = tf.concat(1, [ones_for_bias_wgts, h_with_x])
@@ -46,8 +46,10 @@ class Cell(object):
             h = tf.mul(o, tf.tanh(c))
             return (c, h)
 
+def cross_entropy(observed, actual):
+    return -tf.reduce_sum(actual*tf.log(observed))
 
-def build_graph():
+def build_graph(hyperparameters, n_steps, batch_size):
     cells = []
     for i in xrange(stack_size):
         with tf.variable_scope("Cell_{}".format(i)):
@@ -64,10 +66,10 @@ def build_graph():
     for t in xrange(n_steps):
         next_h = []
         next_c = []
-        x = x_arr.slice(TODO)
+        x = tf.slice(x_in, [0, 0, t], [-1, -1, 1])
 
         for i, cell in enumerate(cells):
-            c, x = cell.build(scope="Cell_{}_t_{}".format(i,t), x_in=x, h_in=h_arr[i], c_in=c_arr[i])
+            c, x = cell.build_node(x_in=x, h_in=h_arr[i], c_in=c_arr[i], scope="Cell_{}_t_{}".format(i,t))
             next_c.append(c)
             next_h.append(x)
 
@@ -80,10 +82,8 @@ def build_graph():
 
     gradients = tf.GradientOptimizer(cost, all_params)
 
+    return (x_in, y_in, all_params, cost, gradients)
 
-
-def cross_entropy(observed, actual):
-    return -tf.reduce_sum(actual*tf.log(observed))
 
 def run_tf_sesh():
     with tf.Session() as sesh:
@@ -94,23 +94,31 @@ def run_tf_sesh():
         print sesh.run(h, feed_dict={x: data})
 
 
-def run_epoch(session):
+# def run_epoch(session):
     
-    # cross entropy
-    cost_function = cross_entropy()
+#     # cross entropy
+#     cost_function = cross_entropy()
 
-    with session as sesh:
-
-
-if name == '__main__':
+#     with session as sesh:
 
 
-    hyperparameters = {
-        "input_size": 4,
-        "n_hidden": 3,
-        "batch_size": 1,
+if __name__ == '__main__':
+
+    n_steps = 2
+    batch_size = 1
+    input_size = 3
+    stack_size = 500
+    hyperparameters = [{
+        "input_size": input_size,
+        "n_hidden": input_size,
+        "batch_size": batch_size,
         "cell_size": 14
-    }
-    # initialize_graph(input_size, n_hidden, batch_size, cell_size)
-    cell = Cell()
-    run_tf_sesh()
+    } for _ in xrange(stack_size)]
+
+    x = np.array([[[0,1,0],[1,0,0]]])
+    y = np.array([[[1,0,0],[0,1,0]]])
+
+    x_in, y_in, params, costs, gradients = build_graph(hyperparameters, n_steps, batch_size)
+
+    with tf.Session() as sesh:
+        print sesh.run(costs, {x_in:x, y_in:y})
