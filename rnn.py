@@ -122,11 +122,15 @@ if __name__ == '__main__':
         "batch_size": batch_size,
     } for _ in xrange(stack_size)]
 
-    x = np.array([[[0,1,0],[1,0,0]]])
-    y = np.array([[[1,0,0],[0,1,0]]])
+    x = np.array([[0,1,0],[1,0,0]])
+    y = np.array([[1,0,0],[0,1,0]])
+
+    x = np.array([x.T])
+    y = np.array([y.T])
 
     x_in, y_in, params, costs, gradients = build_graph(hyperparameters, n_steps, batch_size)
 
     with tf.Session() as sesh:
+        sesh.run(tf.initialize_all_variables())
         print sesh.run(costs, {x_in:x, y_in:y})
 
