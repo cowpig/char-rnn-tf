@@ -8,14 +8,14 @@ class Cell(object):
         self.n_hidden = n_hidden
         self.batch_size = batch_size
 
-
-        # TODO: names ??
-        # TODO: initialize biases as zeros ? (see Karpathy)
         # weights
-        self.w_f = w_f = tf.Variable(tf.random_normal([batch_size,cell_size,n_hidden+input_size+1]), name="w_f")
-        self.w_i = w_i = tf.Variable(tf.random_normal([batch_size,cell_size,n_hidden+input_size+1]), name="w_i")
-        self.w_c = w_c = tf.Variable(tf.random_normal([batch_size,cell_size,n_hidden+input_size+1]), name="w_c")
-        self.w_o = w_o = tf.Variable(tf.random_normal([batch_size,cell_size,n_hidden+input_size+1]), name="w_o")
+        dim_weights = [batch_size, cell_size, n_hidden + input_size]
+	zeros_for_biases = tf.zeros(dim_weights[:-1] + [1])
+
+        self.w_f = w_f = tf.Variable(tf.concat(2, tf.random_normal(dim_weights), zeros_for_biases), name="w_f")
+        self.w_i = w_i = tf.Variable(tf.concat(2, tf.random_normal(dim_weights), zeros_for_biases), name="w_i")
+        self.w_c = w_c = tf.Variable(tf.concat(2, tf.random_normal(dim_weights), zeros_for_biases), name="w_c")
+        self.w_o = w_o = tf.Variable(tf.concat(2, tf.random_normal(dim_weights), zeros_for_biases), name="w_o")
 
         self.ones_for_bias_wgts = ones_for_bias_wgts = tf.constant(np.ones([batch_size,1,1]), name="b", dtype=tf.float32)
 
