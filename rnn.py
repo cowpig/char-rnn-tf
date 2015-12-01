@@ -9,13 +9,15 @@ class Cell(object):
         self.batch_size = batch_size
 
         # weights
-        dim_weights = [batch_size, cell_size, n_hidden + input_size]
-	zeros_for_biases = tf.zeros(dim_weights[:-1] + [1])
+        weight_dims = [batch_size, cell_size, n_hidden + input_size]
+        zeros_for_biases = tf.zeros(weight_dims[:-1] + [1])
 
-        self.w_f = w_f = tf.Variable(tf.concat(2, tf.random_normal(dim_weights), zeros_for_biases), name="w_f")
-        self.w_i = w_i = tf.Variable(tf.concat(2, tf.random_normal(dim_weights), zeros_for_biases), name="w_i")
-        self.w_c = w_c = tf.Variable(tf.concat(2, tf.random_normal(dim_weights), zeros_for_biases), name="w_c")
-        self.w_o = w_o = tf.Variable(tf.concat(2, tf.random_normal(dim_weights), zeros_for_biases), name="w_o")
+        # print tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases])
+
+        self.w_f = w_f = tf.Variable(tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases]), name="w_f")
+        self.w_i = w_i = tf.Variable(tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases]), name="w_i")
+        self.w_c = w_c = tf.Variable(tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases]), name="w_c")
+        self.w_o = w_o = tf.Variable(tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases]), name="w_o")
 
         self.ones_for_bias_wgts = ones_for_bias_wgts = tf.constant(np.ones([batch_size,1,1]), name="b", dtype=tf.float32)
 
@@ -23,6 +25,9 @@ class Cell(object):
 
 
     def build_node(self, x_in, c_in, h_in, scope="lstm_cell"):
+        print (x_in, c_in, h_in, scope)
+        print [type(thing) for thing in (x_in, c_in, h_in, scope)]
+        print [type(thing) for thing in h_in]
         with tf.variable_scope(scope):
             x_with_h = tf.concat(1, [x_in, h_in])
             x_h_concat = tf.concat(1, [ones_for_bias_wgts, h_with_x])
@@ -104,10 +109,10 @@ def run_tf_sesh():
 
 if __name__ == '__main__':
 
-    n_steps = 2
+    n_steps = 4
     batch_size = 1
     input_size = 3
-    stack_size = 500
+    stack_size = 2
     hyperparameters = [{
         "input_size": input_size,
         "n_hidden": input_size,
@@ -122,3 +127,4 @@ if __name__ == '__main__':
 
     with tf.Session() as sesh:
         print sesh.run(costs, {x_in:x, y_in:y})
+
