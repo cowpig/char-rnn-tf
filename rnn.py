@@ -10,14 +10,14 @@ class Cell(object):
 
         # weights
         weight_dims = [batch_size, input_size + output_size, output_size]
-        zeros_for_biases = tf.zeros([batch_size, 1, output_size])
+        zeros_for_bias_wgts = tf.zeros([batch_size, 1, output_size])
 
         # print tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases])
 
-        self.w_f = w_f = tf.Variable(tf.concat(1, [zeros_for_biases, tf.random_normal(weight_dims)]), name="w_f")
-        self.w_i = w_i = tf.Variable(tf.concat(1, [zeros_for_biases, tf.random_normal(weight_dims)]), name="w_i")
-        self.w_c = w_c = tf.Variable(tf.concat(1, [zeros_for_biases, tf.random_normal(weight_dims)]), name="w_c")
-        self.w_o = w_o = tf.Variable(tf.concat(1, [zeros_for_biases, tf.random_normal(weight_dims)]), name="w_o")
+        self.w_f = w_f = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, tf.random_normal(weight_dims)]), trainable=True, name="w_f")
+        self.w_i = w_i = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, tf.random_normal(weight_dims)]), trainable=True, name="w_i")
+        self.w_c = w_c = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, tf.random_normal(weight_dims)]), trainable=True, name="w_c")
+        self.w_o = w_o = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, tf.random_normal(weight_dims)]), trainable=True, name="w_o")
 
         self.params = [w_f, w_i, w_c, w_o]
 
@@ -32,9 +32,9 @@ class Cell(object):
             # print x.shape
             # print h_in.get_shape()
             x_with_h = tf.concat(2, [x_in, h_in])
-            
-            ones_for_bias_wgts = tf.constant(np.ones([batch_size,1,1]), name="b", dtype=tf.float32)
-            x_h_concat = tf.concat(2, [ones_for_bias_wgts, x_with_h])
+
+            ones_for_bias = tf.constant(np.ones([batch_size,1,1]), name="b", dtype=tf.float32)
+            x_h_concat = tf.concat(2, [ones_for_bias, x_with_h])
 
             # forget gate layer
             # print self.w_f.get_shape()
@@ -68,12 +68,12 @@ def build_graph(hyperparameters, n_steps, batch_size):
 
     x_in = tf.placeholder(tf.float32, name="x", shape=(batch_size,n_steps,input_size))
     y_in = tf.placeholder(tf.float32, name="y", shape=(batch_size,n_steps,input_size))
-    h_arr = [tf.Variable(tf.zeros([batch_size,1,cell.output_size]), name="h_in") for cell in cells]
-    c_arr = [tf.Variable(tf.zeros([batch_size,1,cell.input_size]), name="c_in") for cell in cells]
+    h_arr = [tf.Variable(tf.zeros([batch_size,1,cell.output_size]), trainable=False, name="h_in") \
+             for cell in cells]
+    c_arr = [tf.Variable(tf.zeros([batch_size,1,cell.input_size]), trainable=False, name="c_in") \
+             for cell in cells]
     y_arr = []
-    
-    # list of lists of (x, c, h) tuples
-    # dimensions: n_steps by stack size by 3
+
     for t in xrange(n_steps):
         next_h = []
         next_c = []
@@ -109,7 +109,6 @@ def run_tf_sesh():
 
 
 # def run_epoch(session):
-    
 #     # cross entropy
 #     cost_function = cross_entropy()
 
@@ -133,7 +132,7 @@ if __name__ == '__main__':
         "input_size": input_size,
         "output_size": input_size,
         "batch_size": batch_size,
-    
+
     }]
 
     x = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
@@ -143,23 +142,38 @@ if __name__ == '__main__':
     x_in, y_in, params, costs, out = build_graph(hyperparameters, n_steps, batch_size)
 
     tvars = tf.trainable_variables()
+    #for t in tvars:
+        #print t.name
     grads = tf.gradients(costs, tvars)
     optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
     train = optimus_prime.apply_gradients(zip(grads, tvars))
-    
+
     with tf.Session() as sesh:
+        #logger = tf.train.SummaryWriter('./log', sesh.graph_def)
+        #logger = tf.python.training.summary_io.SummaryWriter('./log', sesh.graph_def)
+
         sesh.run(tf.initialize_all_variables())
-        cost = np.inf
+
+        tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
+
+        #cost = np.inf
         i=0
-        while i < 20000:
-            cost, _ = sesh.run([costs, train], {x_in:x, y_in:y})
+        while i < 5:
+            cost, _ = sesh.run([costs, train], feed_dict={x_in:x, y_in:y})
+
+            #logger.add_summary(costs)
+
             if i % 100 == 0:
                 print "cost at epoch {}: {}".format(i, cost)
-            
+
             if i % 1000 == 0:
-                print "predictions:\n{}".format(sesh.run([out], {x_in:x}))
+                print "predictions:\n{}".format(sesh.run(out, feed_dict={x_in:x}))
 
             i+=1
 
+        #logger.close()
+
+        #tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
+        #tf.python.training.summary_io.SummaryWriter('./logdir', sesh.graph_def)
 
 
