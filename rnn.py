@@ -9,17 +9,15 @@ class Cell(object):
         self.batch_size = batch_size
 
         # weights
-        weight_dims = [batch_size, output_size, output_size + input_size]
-        zeros_for_biases = tf.zeros(weight_dims[:-1] + [1])
+        weight_dims = [batch_size, input_size + output_size, output_size]
+        zeros_for_biases = tf.zeros([batch_size, 1, output_size])
 
         # print tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases])
 
-        self.w_f = w_f = tf.Variable(tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases]), name="w_f")
-        self.w_i = w_i = tf.Variable(tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases]), name="w_i")
-        self.w_c = w_c = tf.Variable(tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases]), name="w_c")
-        self.w_o = w_o = tf.Variable(tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases]), name="w_o")
-
-        self.ones_for_bias_wgts = ones_for_bias_wgts = tf.constant(np.ones([batch_size,1,1]), name="b", dtype=tf.float32)
+        self.w_f = w_f = tf.Variable(tf.concat(1, [zeros_for_biases, tf.random_normal(weight_dims)]), name="w_f")
+        self.w_i = w_i = tf.Variable(tf.concat(1, [zeros_for_biases, tf.random_normal(weight_dims)]), name="w_i")
+        self.w_c = w_c = tf.Variable(tf.concat(1, [zeros_for_biases, tf.random_normal(weight_dims)]), name="w_c")
+        self.w_o = w_o = tf.Variable(tf.concat(1, [zeros_for_biases, tf.random_normal(weight_dims)]), name="w_o")
 
         self.params = [w_f, w_i, w_c, w_o]
 
@@ -31,15 +29,21 @@ class Cell(object):
         # print (x_in.name, x_in.dtype)
 
         with tf.variable_scope(scope):
-            x_with_h = tf.concat(1, [x_in, h_in])
-            x_h_concat = tf.concat(1, [self.ones_for_bias_wgts, x_with_h])
+            # print x.shape
+            # print h_in.get_shape()
+            x_with_h = tf.concat(2, [x_in, h_in])
+            
+            ones_for_bias_wgts = tf.constant(np.ones([batch_size,1,1]), name="b", dtype=tf.float32)
+            x_h_concat = tf.concat(2, [ones_for_bias_wgts, x_with_h])
 
             # forget gate layer
-            f = tf.sigmoid(tf.batch_matmul(self.w_f, x_h_concat))
+            print self.w_f.get_shape()
+            print x_h_concat.get_shape()
+            f = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_f))
 
             # candidate values
-            i = tf.sigmoid(tf.batch_matmul(self.w_i, x_h_concat))
-            candidate_c = tf.tanh(tf.batch_matmul(self.w_c, x_h_concat))
+            i = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_i))
+            candidate_c = tf.tanh(tf.batch_matmul(x_h_concat, self.w_c))
 
             # new cell state (hidden)
             # forget old values of c
@@ -49,7 +53,7 @@ class Cell(object):
             c = tf.add(old_c_to_keep, new_c_to_keep)
 
             # new scaled output
-            o = tf.sigmoid(tf.batch_matmul(self.w_o, x_h_concat))
+            o = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_o))
             h = tf.mul(o, tf.tanh(c))
             return (c, h)
 
@@ -62,10 +66,10 @@ def build_graph(hyperparameters, n_steps, batch_size):
         with tf.variable_scope("Cell_{}".format(i)):
             cells.append(Cell(**hyperparameters[i]))
 
-    x_in = tf.placeholder(tf.float32, name="x", shape=(batch_size,input_size,n_steps))
-    y_in = tf.placeholder(tf.float32, name="y", shape=(batch_size,input_size,n_steps))
-    h_arr = [tf.Variable(tf.zeros([batch_size,cell.output_size,1]), name="h_in") for cell in cells]
-    c_arr = [tf.Variable(tf.zeros([batch_size,cell.input_size,1]), name="c_in") for cell in cells]
+    x_in = tf.placeholder(tf.float32, name="x", shape=(batch_size,n_steps,input_size))
+    y_in = tf.placeholder(tf.float32, name="y", shape=(batch_size,n_steps,input_size))
+    h_arr = [tf.Variable(tf.zeros([batch_size,1,cell.output_size]), name="h_in") for cell in cells]
+    c_arr = [tf.Variable(tf.zeros([batch_size,1,cell.input_size]), name="c_in") for cell in cells]
     y_arr = []
     
     # list of lists of (x, c, h) tuples
@@ -73,20 +77,23 @@ def build_graph(hyperparameters, n_steps, batch_size):
     for t in xrange(n_steps):
         next_h = []
         next_c = []
-        x = tf.slice(x_in, [0, 0, t], [-1, -1, 1])
+        x = tf.slice(x_in, [0, t, 0], [-1, 1, -1])
 
         for i, cell in enumerate(cells):
+            # print 'x ', x.get_shape()
+            # print 'h ', h_arr[i].get_shape()
+            # print 'c ', c_arr[i].get_shape()
             c, x = cell.build_node(x_in=x, h_in=h_arr[i], c_in=c_arr[i], scope="Cell_{}_t_{}".format(i,t))
             next_c.append(c)
             next_h.append(x)
 
         h_arr = next_h
         c_arr = next_c
-        vec = tf.nn.softmax(tf.squeeze(x, [2]))
-        y_arr.append(tf.expand_dims(vec, 2))
+        vec = tf.nn.softmax(tf.squeeze(x, [0]))
+        y_arr.append(tf.expand_dims(vec, 0))
 
     all_params = [param for cell in cells for param in cell.params]
-    cost = cross_entropy(tf.concat(2, y_arr), y_in)
+    cost = cross_entropy(tf.concat(1, y_arr), y_in)
 
     gradients = tf.train.GradientDescentOptimizer(cost, all_params)
 
@@ -122,11 +129,11 @@ if __name__ == '__main__':
         "batch_size": batch_size,
     } for _ in xrange(stack_size)]
 
-    x = np.array([[0,1,0],[1,0,0]])
-    y = np.array([[1,0,0],[0,1,0]])
+    x = np.array([[[0,1,0],[1,0,0]]])
+    y = np.array([[[1,0,0],[0,1,0]]])
 
-    x = np.array([x.T])
-    y = np.array([y.T])
+    # x = np.array([x.T])
+    # y = np.array([y.T])
 
     x_in, y_in, params, costs, gradients = build_graph(hyperparameters, n_steps, batch_size)
 
