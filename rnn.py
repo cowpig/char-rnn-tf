@@ -37,8 +37,8 @@ class Cell(object):
             x_h_concat = tf.concat(2, [ones_for_bias, x_with_h])
 
             # forget gate layer
-            # print self.w_f.get_shape()
-            # print x_h_concat.get_shape()
+            # print "w_f: ", self.w_f.get_shape()
+            # print "x_h_concat: ", x_h_concat.get_shape()
             f = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_f))
 
             # candidate values
@@ -92,11 +92,10 @@ def build_graph(hyperparameters, n_steps, batch_size):
         vec = tf.nn.softmax(tf.squeeze(x, [0]))
         y_arr.append(tf.expand_dims(vec, 0))
 
-    all_params = [param for cell in cells for param in cell.params]
     y_out = tf.concat(1, y_arr)
     cost = cross_entropy(y_out, y_in)
 
-    return (x_in, y_in, all_params, cost, y_out)
+    return (x_in, y_in, cost, y_out)
 
 
 def run_tf_sesh():
@@ -125,21 +124,21 @@ if __name__ == '__main__':
 
     hyperparameters = [{
         "input_size": input_size,
-        "output_size": input_size,
+        "output_size": 4,
         "batch_size": batch_size,
     },
     {
-        "input_size": input_size,
+        "input_size": 4,
         "output_size": input_size,
         "batch_size": batch_size,
 
     }]
 
     x = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
-    y = np.array([[[0,1,0],[0,0,1],[1,0,0],[0,1,0]]])
+    y = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
 
 
-    x_in, y_in, params, costs, out = build_graph(hyperparameters, n_steps, batch_size)
+    x_in, y_in, costs, out = build_graph(hyperparameters, n_steps, batch_size)
 
     tvars = tf.trainable_variables()
     #for t in tvars:
