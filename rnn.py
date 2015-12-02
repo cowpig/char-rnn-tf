@@ -153,8 +153,8 @@ if __name__ == '__main__':
     train = optimus_prime.apply_gradients(zip(grads, tvars))
 
     with tf.Session() as sesh:
-        #logger = tf.train.SummaryWriter('./log', sesh.graph_def)
-        #logger = tf.python.training.summary_io.SummaryWriter('./log', sesh.graph_def)
+        logger = tf.train.SummaryWriter('./log', sesh.graph_def)
+        pylogger = tf.python.training.summary_io.SummaryWriter('./pylog', sesh.graph_def)
 
         sesh.run(tf.initialize_all_variables())
         tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
@@ -175,9 +175,6 @@ if __name__ == '__main__':
 
             i+=1
 
-        #logger.close()
-
-        #tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
-        #tf.python.training.summary_io.SummaryWriter('./logdir', sesh.graph_def)
-
+        logger.close()
+        pylogger.close()
 
