@@ -93,9 +93,10 @@ def build_graph(hyperparameters, n_steps, batch_size):
         y_arr.append(tf.expand_dims(vec, 0))
 
     all_params = [param for cell in cells for param in cell.params]
-    cost = cross_entropy(tf.concat(1, y_arr), y_in)
+    y_out = tf.concat(1, y_arr)
+    cost = cross_entropy(y_out, y_in)
 
-    return (x_in, y_in, all_params, cost)
+    return (x_in, y_in, all_params, cost, y_out)
 
 
 def run_tf_sesh():
@@ -117,24 +118,29 @@ def run_tf_sesh():
 
 if __name__ == '__main__':
 
-    n_steps = 2
+    n_steps = 4
     batch_size = 1
     input_size = 3
-    stack_size = 9
+    stack_size = 2
     learning_rate=0.7
+
     hyperparameters = [{
         "input_size": input_size,
         "output_size": input_size,
         "batch_size": batch_size,
-    } for _ in xrange(stack_size)]
+    },
+    {
+        "input_size": input_size,
+        "output_size": input_size,
+        "batch_size": batch_size,
+    
+    }]
 
-    x = np.array([[[0,1,0],[1,0,0]]])
-    y = np.array([[[1,0,0],[0,1,0]]])
+    x = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
+    y = np.array([[[0,1,0],[0,0,1],[1,0,0],[0,1,0]]])
 
-    # x = np.array([x.T])
-    # y = np.array([y.T])
 
-    x_in, y_in, params, costs = build_graph(hyperparameters, n_steps, batch_size)
+    x_in, y_in, params, costs, out = build_graph(hyperparameters, n_steps, batch_size)
 
     tvars = tf.trainable_variables()
     grads = tf.gradients(costs, tvars)
@@ -145,9 +151,15 @@ if __name__ == '__main__':
         sesh.run(tf.initialize_all_variables())
         cost = np.inf
         i=0
-        while cost > 0.00001:
-            i+=1
+        while i < 20000:
             cost, _ = sesh.run([costs, train], {x_in:x, y_in:y})
             if i % 100 == 0:
                 print "cost at epoch {}: {}".format(i, cost)
+            
+            if i % 1000 == 0:
+                print "predictions:\n{}".format(sesh.run([out], {x_in:x}))
+
+            i+=1
+
+
 
