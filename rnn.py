@@ -37,8 +37,8 @@ class Cell(object):
             x_h_concat = tf.concat(2, [ones_for_bias_wgts, x_with_h])
 
             # forget gate layer
-            print self.w_f.get_shape()
-            print x_h_concat.get_shape()
+            # print self.w_f.get_shape()
+            # print x_h_concat.get_shape()
             f = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_f))
 
             # candidate values
@@ -95,9 +95,7 @@ def build_graph(hyperparameters, n_steps, batch_size):
     all_params = [param for cell in cells for param in cell.params]
     cost = cross_entropy(tf.concat(1, y_arr), y_in)
 
-    gradients = tf.train.GradientDescentOptimizer(cost, all_params)
-
-    return (x_in, y_in, all_params, cost, gradients)
+    return (x_in, y_in, all_params, cost)
 
 
 def run_tf_sesh():
@@ -122,7 +120,8 @@ if __name__ == '__main__':
     n_steps = 2
     batch_size = 1
     input_size = 3
-    stack_size = 2
+    stack_size = 9
+    learning_rate=0.7
     hyperparameters = [{
         "input_size": input_size,
         "output_size": input_size,
@@ -135,9 +134,20 @@ if __name__ == '__main__':
     # x = np.array([x.T])
     # y = np.array([y.T])
 
-    x_in, y_in, params, costs, gradients = build_graph(hyperparameters, n_steps, batch_size)
+    x_in, y_in, params, costs = build_graph(hyperparameters, n_steps, batch_size)
 
+    tvars = tf.trainable_variables()
+    grads = tf.gradients(costs, tvars)
+    optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
+    train = optimus_prime.apply_gradients(zip(grads, tvars))
+    
     with tf.Session() as sesh:
         sesh.run(tf.initialize_all_variables())
-        print sesh.run(costs, {x_in:x, y_in:y})
+        cost = np.inf
+        i=0
+        while cost > 0.00001:
+            i+=1
+            cost, _ = sesh.run([costs, train], {x_in:x, y_in:y})
+            if i % 100 == 0:
+                print "cost at epoch {}: {}".format(i, cost)
 
