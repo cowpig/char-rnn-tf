@@ -14,13 +14,13 @@ class Cell(object):
 
         # print tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases])
 
-        self.w_f = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, 
+        self.w_f = tf.Variable(tf.concat(1, [zeros_for_bias_wgts,
                                 tf.random_normal(weight_dims)]), trainable=True, name="w_f")
-        self.w_i = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, 
+        self.w_i = tf.Variable(tf.concat(1, [zeros_for_bias_wgts,
                                 tf.random_normal(weight_dims)]), trainable=True, name="w_i")
-        self.w_c = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, 
+        self.w_c = tf.Variable(tf.concat(1, [zeros_for_bias_wgts,
                                 tf.random_normal(weight_dims)]), trainable=True, name="w_c")
-        self.w_o = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, 
+        self.w_o = tf.Variable(tf.concat(1, [zeros_for_bias_wgts,
                                 tf.random_normal(weight_dims)]), trainable=True, name="w_o")
 
         self.params = [self.w_f, self.w_i, self.w_c, self.w_o]
@@ -87,7 +87,7 @@ def build_graph(hyperparameters, n_steps, batch_size):
             # print 'x ', x.get_shape()
             # print 'h ', h_arr[i].get_shape()
             # print 'c ', c_arr[i].get_shape()
-            c, x = cell.build_node(x_in=x, h_in=h_arr[i], c_in=c_arr[i], 
+            c, x = cell.build_node(x_in=x, h_in=h_arr[i], c_in=c_arr[i],
                                     scope="Cell_{}_t_{}".format(i,t))
             next_c.append(c)
             next_h.append(x)
@@ -160,7 +160,7 @@ if __name__ == '__main__':
         tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
 
         cost = np.inf
-        
+
         i=0
         while i < 5:
             cost, _ = sesh.run([costs, train], feed_dict={x_in:x, y_in:y})
