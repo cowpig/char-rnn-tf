@@ -26,13 +26,16 @@ class Cell(object):
         self.params = [self.w_f, self.w_i, self.w_c, self.w_o]
 
 
-    def build_node(self, x_in, c_in, h_in, scope="lstm_cell"):
-        #print (x_in, c_in, h_in, scope)
-        #print [type(thing) for thing in (x_in, c_in, h_in, scope)]
+    def build_node(self, x_in, state, scope="lstm_cell"):
+        # print (x_in, c_in, h_in, scope)
+        # print [type(thing) for thing in (x_in, c_in, h_in, scope)]
         # print [(item.name, item.dtype) for thing in (h_in, c_in) for item in thing]
         # print (x_in.name, x_in.dtype)
 
+
         with tf.variable_scope(scope):
+            print state.get_shape()
+            c_in, h_in = tf.split(2, 2, state)
             # print x.shape
             # print h_in.get_shape()
             x_with_h = tf.concat(2, [x_in, h_in])
@@ -64,43 +67,44 @@ class Cell(object):
 def cross_entropy(observed, actual):
     return -tf.reduce_sum(actual*tf.log(observed))
 
-def build_graph(hyperparameters, n_steps, batch_size):
+def build_graph(hyperparams, n_steps, batch_size):
     cells = []
+    states = []
     for i in xrange(stack_size):
         with tf.variable_scope("Cell_{}".format(i)):
-            cells.append(Cell(**hyperparameters[i]))
+            cells.append(Cell(**hyperparams[i]))
+            # states handle both h_in and c_in
+            states.append(tf.placeholder(tf.float32, name="input_state",  
+                    shape=(batch_size, 1, hyperparams[i]['output_size']*2)))
 
-    x_in = tf.placeholder(tf.float32, name="x", shape=(batch_size,n_steps,input_size))
-    y_in = tf.placeholder(tf.float32, name="y", shape=(batch_size,n_steps,input_size))
-    h_arr = [tf.Variable(tf.zeros([batch_size,1,cell.output_size]), trainable=False, name="h_in") \
-             for cell in cells]
-    c_arr = [tf.Variable(tf.zeros([batch_size,1,cell.output_size]), trainable=False, name="c_in") \
-             for cell in cells]
+    x_in = tf.placeholder(tf.float32, name="x", shape=(batch_size,n_steps,cells[0].input_size))
+    y_in = tf.placeholder(tf.float32, name="y", shape=(batch_size,n_steps,cells[-1].output_size))
+
+
     y_arr = []
 
     for t in xrange(n_steps):
-        next_h = []
-        next_c = []
-        x = tf.slice(x_in, [0, t, 0], [-1, 1, -1])
+        next_states = []
+        # print "x_in", x_in.get_shape()
+        out = tf.slice(x_in, [0, t, 0], [-1, 1, -1])
 
         for i, cell in enumerate(cells):
             # print 'x ', x.get_shape()
             # print 'h ', h_arr[i].get_shape()
             # print 'c ', c_arr[i].get_shape()
-            c, x = cell.build_node(x_in=x, h_in=h_arr[i], c_in=c_arr[i],
+            c, out = cell.build_node(x_in=out, state=states[i],
                                     scope="Cell_{}_t_{}".format(i,t))
-            next_c.append(c)
-            next_h.append(x)
+            next_states.append(tf.concat(2, [c, out]))
 
-        h_arr = next_h
-        c_arr = next_c
-        vec = tf.nn.softmax(tf.squeeze(x, [0]))
+        states = next_states
+
+        vec = tf.nn.softmax(tf.squeeze(out, [0]))
         y_arr.append(tf.expand_dims(vec, 0))
 
     y_out = tf.concat(1, y_arr)
     cost = cross_entropy(y_out, y_in)
 
-    return (x_in, y_in, cost, y_out)
+    return (x_in, y_in, states, cost, y_out)
 
 
 def run_tf_sesh():
@@ -127,7 +131,7 @@ if __name__ == '__main__':
     stack_size = 2
     learning_rate=0.7
 
-    hyperparameters = [{
+    params = [{
         "input_size": input_size,
         "output_size": 4,
         "batch_size": batch_size,
@@ -141,31 +145,38 @@ if __name__ == '__main__':
 
     x = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
     y = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
+    states_0 = [np.zeros([cell['batch_size'],1,cell['output_size']*2]) for cell in params] 
 
 
-    x_in, y_in, costs, out = build_graph(hyperparameters, n_steps, batch_size)
+    x_in, y_in, c_states, costs, out = build_graph(params, n_steps, batch_size)
+    print [c.name for c in c_states] 
 
     tvars = tf.trainable_variables()
-    #for t in tvars:
-        #print t.name
+    for t in tvars:
+        print t.name
+
     grads = tf.gradients(costs, tvars)
     optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
     train = optimus_prime.apply_gradients(zip(grads, tvars))
 
     with tf.Session() as sesh:
-        logger = tf.train.SummaryWriter('./log', sesh.graph_def)
-        pylogger = tf.python.training.summary_io.SummaryWriter('./pylog', sesh.graph_def)
+        # logger = tf.train.SummaryWriter('./log', sesh.graph_def)
+        # pylogger = tf.python.training.summary_io.SummaryWriter('./pylog', sesh.graph_def)
 
+        states = states_0
         sesh.run(tf.initialize_all_variables())
-        tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
+        # tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
 
         cost = np.inf
 
         i=0
-        while i < 5:
-            cost, _ = sesh.run([costs, train], feed_dict={x_in:x, y_in:y})
-
-            #logger.add_summary(costs)
+        while i < 5000:
+            feed_dict = dict(zip(c_states,states))
+            feed_dict.update({x_in:x, y_in:y})
+            print feed_dict
+            cost, states, out, _ = sesh.run([costs, c_states, out, train], 
+                            feed_dict=feed_dict)
+            print tf.Graph().get_operations()
 
             if i % 100 == 0:
                 print "cost at epoch {}: {}".format(i, cost)
@@ -175,6 +186,6 @@ if __name__ == '__main__':
 
             i+=1
 
-        logger.close()
-        pylogger.close()
+        # logger.close()
+        # pylogger.close()
 
