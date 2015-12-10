@@ -34,19 +34,19 @@ class Cell(object):
 
 
         with tf.variable_scope(scope):
-            print "state: ", state.get_shape()
+            #print "state: ", state.get_shape()
             c_in, h_in = tf.split(2, 2, state)
-            print "x: ", x.shape
-            print "h_in: ", h_in.get_shape()
-            print "c_in: ", c_in.get_shape()
+            #print "x: ", x.shape
+            #print "h_in: ", h_in.get_shape()
+            #print "c_in: ", c_in.get_shape()
             x_with_h = tf.concat(2, [x_in, h_in])
 
-            ones_for_bias = tf.constant(np.ones([batch_size,1,1]), name="b", dtype=tf.float32)
+            ones_for_bias = tf.constant(np.ones([self.batch_size,1,1]), name="b", dtype=tf.float32)
             x_h_concat = tf.concat(2, [ones_for_bias, x_with_h])
 
             # forget gate layer
-            print "w_f: ", self.w_f.get_shape()
-            print "x_h_concat: ", x_h_concat.get_shape()
+          # print "w_f: ", self.w_f.get_shape()
+          # print "x_h_concat: ", x_h_concat.get_shape()
             f = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_f))
 
             # candidate values
@@ -68,7 +68,7 @@ class Cell(object):
 def cross_entropy(observed, actual):
     return -tf.reduce_sum(actual*tf.log(observed))
 
-def build_graph(hyperparams, n_steps, batch_size):
+def build_graph(hyperparams, n_steps, batch_size, stack_size):
     cells = []
     for i in xrange(stack_size):
         with tf.variable_scope("Cell_{}".format(i)):
@@ -76,11 +76,11 @@ def build_graph(hyperparams, n_steps, batch_size):
 
     # states handle both h_in and c_in
     total_state_size = sum([param['output_size']*2 for param in hyperparams])
-    states_in = tf.placeholder(tf.float32, name="states_in", 
+    states_in = tf.placeholder(tf.float32, name="states_in",
                                 shape=(batch_size, 1, total_state_size))
-    x_in = tf.placeholder(tf.float32, name="x", 
+    x_in = tf.placeholder(tf.float32, name="x",
                                 shape=(batch_size,n_steps,cells[0].input_size))
-    y_in = tf.placeholder(tf.float32, name="y", 
+    y_in = tf.placeholder(tf.float32, name="y",
                                 shape=(batch_size,n_steps,cells[-1].output_size))
 
 
@@ -98,7 +98,7 @@ def build_graph(hyperparams, n_steps, batch_size):
         out = tf.slice(x_in, [0, t, 0], [-1, 1, -1])
 
         for i, cell in enumerate(cells):
-            # print 'x ', x.get_shape()
+            # print 'x ', x.get_shape
             # print 'h ', h_arr[i].get_shape()
             # print 'c ', c_arr[i].get_shape()
 
@@ -108,7 +108,7 @@ def build_graph(hyperparams, n_steps, batch_size):
 
         states = next_states
 
-        vec = tf.nn.softmax(tf.squeeze(out, [0]))
+        vec = tf.nn.softmax(tf.squeeze(out, [1]))
         y_arr.append(tf.expand_dims(vec, 0))
 
     y_out = tf.concat(1, y_arr)
@@ -142,16 +142,18 @@ if __name__ == '__main__':
 
     }]
 
-    x = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
-    y = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
+    #x = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
+    #y = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
+
+
     states_0 = initial_state(params)
 
 
-    x_in, y_in, states_in, states_out, y_out, costs = build_graph(params, n_steps, batch_size)
+    x_in, y_in, states_in, states_out, y_out, costs = build_graph(params, n_steps, batch_size, stack_size)
 
     tvars = tf.trainable_variables()
     # for t in tvars:
-    #     print t.name
+    #   # print t.name
 
     grads = tf.gradients(costs, tvars)
     optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
@@ -175,13 +177,12 @@ if __name__ == '__main__':
             # print tf.Graph().get_operations()
 
             if i % 100 == 0:
-                print "cost at epoch {}: {}".format(i, cost)
+              print "cost at epoch {}: {}".format(i, cost)
 
             if i % 1000 == 0:
-                print "predictions:\n{}".format(out)
+              print "predictions:\n{}".format(out)
 
             i+=1
 
         # logger.close()
         # pylogger.close()
-
