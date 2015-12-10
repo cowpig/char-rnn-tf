@@ -7,7 +7,6 @@ def cross_entropy(observed, actual):
 
 
 if __name__ == '__main__':
-
     n_steps = 4
     batch_size = 1
     input_size = 3
@@ -27,8 +26,9 @@ if __name__ == '__main__':
 
     lstm_cell = rnn_cell.BasicLSTMCell(input_size, forget_bias=0.0)
     stack = rnn_cell.MultiRNNCell([lstm_cell]*stack_size)
+    initial_state = stack.zero_state(batch_size, tf.float32)
 
-    cellstate = stack.zero_state(batch_size, tf.float32)
+    cellstate = initial_state
     y_arr = []
 
     for t in xrange(n_steps):
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     y_out = tf.concat(1, y_arr)
     # print "y_out", y_out.get_shape()
     # print "y_in", y_in.get_shape()
-    cost = cross_entropy(y_out, y_in)
+    costs = cross_entropy(y_out, y_in)
     #print "cost", cost.get_shape()
     
     tvars = tf.trainable_variables()
@@ -62,11 +62,15 @@ if __name__ == '__main__':
     for t in tvars:
         print t.name
     
-    grads = tf.gradients(cost, tvars)
+    grads = tf.gradients(costs, tvars)
     optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
+    # print optimus_prime
     train = optimus_prime.apply_gradients(zip(grads, tvars))
+    # print train
 
+    # cost = np.inf
     with tf.Session() as sesh:
+        state = initial_state.eval()
         sesh.run(tf.initialize_all_variables())
         # out = sesh.run([y_out], {x_in:x_data})#, y_in:y_data})
         # print "out", out
@@ -74,11 +78,21 @@ if __name__ == '__main__':
         # print "diff", diff
         # cost = sesh.run([cost], {x_in:x_data, y_in:y_data})
         # print "cost", cost
-        while True:
-            cost, train = sesh.run([cost, train], 
-                                    {x_in:x_data, y_in:y_data})
-            print "cost", cost
-            
+
+        i=0
+        while i < 5000:
+            cost, state, out, _ = sesh.run([costs, cellstate, y_out, train], 
+                                    {x_in:x_data, y_in:y_data, initial_state:state})
+
+            # print tf.Graph().get_operations()
+
+            if i % 100 == 0:
+                print "cost at epoch {}: {}".format(i, cost)
+
+            if i % 1000 == 0:
+                print "predictions:\n{}".format(out)
+
+            i+=1
     print "end"
     # cost = cross_entropy(y_out, y_in)
     

@@ -132,11 +132,11 @@ if __name__ == '__main__':
 
     params = [{
         "input_size": input_size,
-        "output_size": 4,
+        "output_size": input_size,
         "batch_size": batch_size,
     },
     {
-        "input_size": 4,
+        "input_size": input_size,
         "output_size": input_size,
         "batch_size": batch_size,
 
