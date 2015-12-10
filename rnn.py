@@ -8,20 +8,26 @@ class Cell(object):
         self.output_size = output_size
         self.batch_size = batch_size
 
+
         # weights
         weight_dims = [batch_size, input_size + output_size, output_size]
+        random_weights = tf.random_normal(weight_dims)
         zeros_for_bias_wgts = tf.zeros([batch_size, 1, output_size])
+
+        # print "input_size: ", input_size
+        # print "output_size: ", output_size
+        # print "weight_dims: ", weight_dims
 
         # print tf.concat(2, [tf.random_normal(weight_dims), zeros_for_biases])
 
-        self.w_f = tf.Variable(tf.concat(1, [zeros_for_bias_wgts,
-                                tf.random_normal(weight_dims)]), trainable=True, name="w_f")
-        self.w_i = tf.Variable(tf.concat(1, [zeros_for_bias_wgts,
-                                tf.random_normal(weight_dims)]), trainable=True, name="w_i")
-        self.w_c = tf.Variable(tf.concat(1, [zeros_for_bias_wgts,
-                                tf.random_normal(weight_dims)]), trainable=True, name="w_c")
-        self.w_o = tf.Variable(tf.concat(1, [zeros_for_bias_wgts,
-                                tf.random_normal(weight_dims)]), trainable=True, name="w_o")
+        self.w_f = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, random_weights]),
+                                                        trainable=True, name="w_f")
+        self.w_i = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, random_weights]),
+                                                        trainable=True, name="w_i")
+        self.w_c = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, random_weights]),
+                                                        trainable=True, name="w_c")
+        self.w_o = tf.Variable(tf.concat(1, [zeros_for_bias_wgts, random_weights]),
+                                                        trainable=True, name="w_o")
 
         self.params = [self.w_f, self.w_i, self.w_c, self.w_o]
 
@@ -34,19 +40,20 @@ class Cell(object):
 
 
         with tf.variable_scope(scope):
-            #print "state: ", state.get_shape()
+            # print "scope: ", scope
+            # print "state: ", state.get_shape()
             c_in, h_in = tf.split(2, 2, state)
-            #print "x: ", x.shape
-            #print "h_in: ", h_in.get_shape()
-            #print "c_in: ", c_in.get_shape()
+            # print "x: ", x.shape
+            # print "h_in: ", h_in.get_shape()
+            # print "c_in: ", c_in.get_shape()
             x_with_h = tf.concat(2, [x_in, h_in])
 
             ones_for_bias = tf.constant(np.ones([self.batch_size,1,1]), name="b", dtype=tf.float32)
             x_h_concat = tf.concat(2, [ones_for_bias, x_with_h])
 
             # forget gate layer
-          # print "w_f: ", self.w_f.get_shape()
-          # print "x_h_concat: ", x_h_concat.get_shape()
+            # print "w_f: ", self.w_f.get_shape()
+            # print "x_h_concat: ", x_h_concat.get_shape()
             f = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_f))
 
             # candidate values
@@ -64,6 +71,7 @@ class Cell(object):
             o = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_o))
             h = tf.mul(o, tf.tanh(c))
             return (c, h)
+
 
 def cross_entropy(observed, actual):
     return -tf.reduce_sum(actual*tf.log(observed))
@@ -95,8 +103,8 @@ def build_graph(hyperparams, n_steps, batch_size, stack_size):
     for t in xrange(n_steps):
         next_states = []
         # print "x_in", x_in.get_shape()
-        out = tf.slice(x_in, [0, t, 0], [-1, 1, -1])
-
+        x_at_t = tf.slice(x_in, [0, t, 0], [-1, 1, -1])
+        out = x_at_t
         for i, cell in enumerate(cells):
             # print 'x ', x.get_shape
             # print 'h ', h_arr[i].get_shape()
@@ -108,14 +116,18 @@ def build_graph(hyperparams, n_steps, batch_size, stack_size):
 
         states = next_states
 
+        # print "out: ", out.get_shape()
         vec = tf.nn.softmax(tf.squeeze(out, [1]))
-        y_arr.append(tf.expand_dims(vec, 0))
+        y_arr.append(tf.expand_dims(vec, 1))
 
     y_out = tf.concat(1, y_arr)
     states_out = tf.concat(2, states)
+    # print "y_out: ", y_out.get_shape()
+    # print "y_in: ", y_in.get_shape()
     cost = cross_entropy(y_out, y_in)
 
     return (x_in, y_in, states_in, states_out, y_out, cost)
+
 
 def initial_state(hyperparams):
     total_state_size = sum([param['output_size']*2 for param in hyperparams])
@@ -125,26 +137,26 @@ def initial_state(hyperparams):
 if __name__ == '__main__':
 
     n_steps = 4
-    batch_size = 1
+    batch_size = 2
     input_size = 3
     stack_size = 2
-    learning_rate=0.7
+    learning_rate=0.99
 
     params = [{
         "input_size": input_size,
-        "output_size": input_size,
+        "output_size": 8,
         "batch_size": batch_size,
     },
     {
-        "input_size": input_size,
+        "input_size": 8,
         "output_size": input_size,
         "batch_size": batch_size,
 
     }]
 
-    #x = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
-    #y = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
 
+    x = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]], [[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
+    y = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]], [[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
 
     states_0 = initial_state(params)
 
@@ -170,7 +182,7 @@ if __name__ == '__main__':
         cost = np.inf
 
         i=0
-        while i < 5000:
+        while True:
             state, out, cost, _ = sesh.run([states_out, y_out, costs, train], 
                             feed_dict={x_in:x, y_in:y, states_in:state})
 
