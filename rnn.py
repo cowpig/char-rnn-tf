@@ -85,7 +85,6 @@ def build_graph(hyperparams, n_steps, batch_size):
 
 
     y_arr = []
-    no_softmax_cost_arr = []
     states = []
     n=0
     for cell in cells:
@@ -111,27 +110,10 @@ def build_graph(hyperparams, n_steps, batch_size):
 
         vec = tf.nn.softmax(tf.squeeze(out, [0]))
         y_arr.append(tf.expand_dims(vec, 0))
-        
-        no_softmax_vec = tf.squeeze(out, [0])
-        #no_softmax_y_arr.append(tf.expand_dims(no_softmax_vec, 0))
-        tf_cost = tf.nn.softmax_cross_entropy_with_logits(
-            no_softmax_vec, y_in[t], name="SequenceLoss/CrossEntropy{}".format(t))
-
-
-        no_softmax_cost_arr.append(tf_cost)
-        
-    log_perps = tf.add_n(log_perp_list)
-    if average_across_timesteps:
-      total_size = tf.add_n(weights)
-      total_size += 1e-12  # Just to avoid division by 0 for all-0 weights.
-      log_perps /= total_size
-  return log_perps
-
 
     y_out = tf.concat(1, y_arr)
     states_out = tf.concat(2, states)
     cost = cross_entropy(y_out, y_in)
-    
 
     return (x_in, y_in, states_in, states_out, y_out, cost)
 
