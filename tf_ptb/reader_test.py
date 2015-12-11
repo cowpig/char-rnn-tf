@@ -12,7 +12,7 @@ import tensorflow.python.platform
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.models.rnn.ptb import reader
+import reader
 from tensorflow.python.platform import gfile
 
 

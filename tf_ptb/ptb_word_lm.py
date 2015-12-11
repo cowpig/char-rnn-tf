@@ -41,7 +41,7 @@ To run:
 
 """
 from __future__ import absolute_import
-from __future__ import division
+# from __future__ import division
 from __future__ import print_function
 
 import time
@@ -53,7 +53,7 @@ import tensorflow as tf
 
 from tensorflow.models.rnn import rnn_cell
 from tensorflow.models.rnn import seq2seq
-from tensorflow.models.rnn.ptb import reader
+import reader
 
 flags = tf.flags
 logging = tf.logging

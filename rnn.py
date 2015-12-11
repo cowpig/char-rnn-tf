@@ -31,13 +31,11 @@ class Cell(object):
 
         self.params = [self.w_f, self.w_i, self.w_c, self.w_o]
 
-
     def build_node(self, x_in, state, scope="lstm_cell"):
         # print (x_in, c_in, h_in, scope)
         # print [type(thing) for thing in (x_in, c_in, h_in, scope)]
         # print [(item.name, item.dtype) for thing in (h_in, c_in) for item in thing]
         # print (x_in.name, x_in.dtype)
-
 
         with tf.variable_scope(scope):
             # print "scope: ", scope
@@ -72,6 +70,14 @@ class Cell(object):
             h = tf.mul(o, tf.tanh(c))
             return (c, h)
 
+def fully_connected_layer(var_in, activation=tf.sigmoid, scope="fully_connected_layer"):
+    with tf.variable_scope(scope):
+        shape = var_in.get_shape()
+        b = tf.Variable(tf.zeros([shape[1]]), name="b", trainable=True)
+        w = tf.Variable(tf.random_normal([shape[1].value]*2), name="w", trainable=True)
+        output = activation(tf.nn.xw_plus_b(var_in, w, b))
+
+    return output
 
 def cross_entropy(observed, actual):
     return -tf.reduce_sum(actual*tf.log(observed))
@@ -116,8 +122,11 @@ def build_graph(hyperparams, n_steps, batch_size, stack_size):
 
         states = next_states
 
+        # final_1 = fully_connected_layer(tf.squeeze())
+        final = fully_connected_layer(tf.squeeze(out, [1]), activation=tf.identity, 
+                                            scope="fully_conn_t{}".format(t))
         # print "out: ", out.get_shape()
-        vec = tf.nn.softmax(tf.squeeze(out, [1]))
+        vec = tf.nn.softmax(final)
         y_arr.append(tf.expand_dims(vec, 1))
 
     y_out = tf.concat(1, y_arr)
@@ -134,13 +143,44 @@ def initial_state(hyperparams):
     return np.zeros((hyperparams[0]['batch_size'], 1, total_state_size))
 
 
+def train(dataset, starting_state, x_in, y_in, states_in, states_out, y_out, costs, train_op):
+    with tf.Session() as sesh:
+        # logger = tf.train.SummaryWriter('./log', sesh.graph_def)
+        # pylogger = tf.python.training.summary_io.SummaryWriter('./pylog', sesh.graph_def)
+
+        state = starting_state
+        sesh.run(tf.initialize_all_variables())
+        # tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
+
+        cost = np.inf
+
+        i=0
+        while True:
+            for step, (x, y) in enumerate(dataset()):
+                state, out, cost, _ = sesh.run([states_out, y_out, costs, train_op], 
+                                feed_dict={x_in:x, 
+                                            y_in:y, 
+                                            states_in:state})
+
+                # print tf.Graph().get_operations()
+
+            if i % 100 == 0:
+              print "cost at epoch {}: {}".format(i, cost)
+
+            if i % 1000 == 0:
+              print "predictions:\n{}".format(out)
+
+            i+=1
+
+
+
 if __name__ == '__main__':
 
     n_steps = 4
     batch_size = 2
     input_size = 3
     stack_size = 2
-    learning_rate=0.99
+    learning_rate=0.1
 
     params = [{
         "input_size": input_size,
@@ -154,12 +194,7 @@ if __name__ == '__main__':
 
     }]
 
-
-    x = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]], [[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
-    y = np.array([[[1,0,0],[0,1,0],[0,0,1],[1,0,0]], [[1,0,0],[0,1,0],[0,0,1],[1,0,0]]])
-
-    states_0 = initial_state(params)
-
+    state_0 = initial_state(params)
 
     x_in, y_in, states_in, states_out, y_out, costs = build_graph(params, n_steps, batch_size, stack_size)
 
@@ -169,32 +204,14 @@ if __name__ == '__main__':
 
     grads = tf.gradients(costs, tvars)
     optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
-    train = optimus_prime.apply_gradients(zip(grads, tvars))
+    train_op = optimus_prime.apply_gradients(zip(grads, tvars))
 
-    with tf.Session() as sesh:
-        # logger = tf.train.SummaryWriter('./log', sesh.graph_def)
-        # pylogger = tf.python.training.summary_io.SummaryWriter('./pylog', sesh.graph_def)
+    def data_iterator():
+        x = np.array([[ [1,0,0],[0,1,0],[0,0,1],[1,0,0]],
+                      [ [1,0,0],[0,1,0],[0,0,1],[1,0,0]] ])
 
-        state = states_0
-        sesh.run(tf.initialize_all_variables())
-        # tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
+        y = np.array([[ [1,0,0],[0,1,0],[0,0,1],[1,0,0]],
+                      [ [1,0,0],[0,1,0],[0,0,1],[1,0,0]] ])
+        yield (x, y)
 
-        cost = np.inf
-
-        i=0
-        while True:
-            state, out, cost, _ = sesh.run([states_out, y_out, costs, train], 
-                            feed_dict={x_in:x, y_in:y, states_in:state})
-
-            # print tf.Graph().get_operations()
-
-            if i % 100 == 0:
-              print "cost at epoch {}: {}".format(i, cost)
-
-            if i % 1000 == 0:
-              print "predictions:\n{}".format(out)
-
-            i+=1
-
-        # logger.close()
-        # pylogger.close()
+    train(data_iterator, state_0, x_in, y_in, states_in, states_out, y_out, costs, train_op)
