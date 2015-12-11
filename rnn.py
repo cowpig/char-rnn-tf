@@ -199,9 +199,6 @@ if __name__ == '__main__':
     x_in, y_in, states_in, states_out, y_out, costs = build_graph(params, n_steps, batch_size, stack_size)
 
     tvars = tf.trainable_variables()
-    # for t in tvars:
-    #   # print t.name
-
     grads = tf.gradients(costs, tvars)
     optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
     train_op = optimus_prime.apply_gradients(zip(grads, tvars))
