@@ -20,21 +20,21 @@ class DataSet(object):
         self.n_chars = len(all_chars)
 
 
-    def yield_examples(self, dataset="train", batch_size=None):
+    def yield_examples(self, dataset="train", steps=None):
         if dataset not in ("train", "valid", "test"):
             raise Exception("Invalid dataset")
         
         dataset_len = self.idx[dataset][1] - self.idx[dataset][0]
 
-        if batch_size is None:
-            batch_size = dataset_len-1
+        if steps is None:
+            steps = 1
 
-        n_batches = (dataset_len-1) / batch_size
+        n_steps = (dataset_len-1) / steps
 
-        for i in xrange(n_batches):
-            idx = self.idx[dataset][0] + i*batch_size
-            x = np.eye(self.n_chars)[self.data[idx:idx+batch_size]]
-            y = np.eye(self.n_chars)[self.data[idx+1:idx+batch_size+1]]
+        for i in xrange(n_steps):
+            idx = self.idx[dataset][0] + i*steps
+            x = np.eye(self.n_chars)[self.data[idx:idx+steps]]
+            y = np.eye(self.n_chars)[self.data[idx+1:idx+steps+1]]
             yield(x, y)
 
     def convert(self, ords):
