@@ -56,11 +56,11 @@ class LSTM(object):
             # forget gate layer
             # print "w_f: ", self.w_f.get_shape()
             # print "x_h_concat: ", x_h_concat.get_shape()
-            f = tf.sigmoid(tf.batch_matmul(z_f))
+            f = tf.sigmoid(z_f)
 
             # candidate values
             i = tf.sigmoid(z_i)
-            candidate_c = tf.tanh(tf.batch_matmul(z_c))
+            candidate_c = tf.tanh(z_c)
 
             # new cell state (hidden)
             # forget old values of c
