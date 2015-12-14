@@ -275,6 +275,8 @@ def main(unused_args):
 
     tf.initialize_all_variables().run()
 
+    import pdb; pdb.set_trace()
+
     for i in range(config.max_max_epoch):
       lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
       m.assign_lr(session, config.learning_rate * lr_decay)
