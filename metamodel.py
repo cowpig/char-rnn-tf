@@ -4,23 +4,22 @@ import tensorflow as tf
 import numpy as np
 
 if __name__ == "__main__":
+    dataset = data.DataSet('./data/dum.txt')
+    # dataset.idx['train'] = (0,320)
 
-    dataset = data.DataSet('./data/letsgetmeta.txt')
-    dataset.idx['train'] = (0,1024)
-
-    n_steps = 32
+    n_steps = 16
     batch_size = 1 # data module has no support for batches yet
     input_size = dataset.n_chars
     stack_size = 2
-    learning_rate=0.01
+    learning_rate=0.001
 
     params = [{
         "input_size": input_size,
-        "output_size": 512,
+        "output_size": input_size,
         "batch_size": batch_size,
     },
     {
-        "input_size": 512,
+        "input_size": input_size,
         "output_size": input_size,
         "batch_size": batch_size,
     }]
@@ -41,33 +40,49 @@ if __name__ == "__main__":
 
         cost = np.inf
 
-        i=0
-        while i < 5000:
+        itr=0
+        try:
+            while itr < 5000:
 
-            for (x,y) in dataset.yield_examples(steps=n_steps):
-                
-                state, out, cost, _ = sesh.run([states_out, y_out, costs, train],
-                                feed_dict={x_in:np.array([x]), 
-                                            y_in:np.array([y]), 
-                                            states_in:state})
+                for (x,y) in dataset.yield_examples(steps=n_steps):
+                    
+                    state, out, cost, _ = sesh.run([states_out, y_out, costs, train],
+                                    feed_dict={x_in:np.array([x]), 
+                                                y_in:np.array([y]), 
+                                                states_in:state})
 
-            if i % 1 == 0:
-                print "cost at epoch {}: {}".format(i, cost)
+                if itr % 1 == 0:
+                    print "cost at epoch {}: {}".format(itr, cost)
 
-            # if i % 10 == 0:
-            #     readable_x = ''.join(dataset.convert(x))
-            #     readable_out = []
+                if itr % 5 == 0:
+                    readable_x = u''.join(unichr(char) for char in dataset.convert(dataset.data_to_ords(x)))
+                    #print readable_x
+                    readable_out = []
 
-            #     indexed_probs =sorted([idxed for idxed in enumerate(out)],
-            #                                 key=lambda x: x[1], reverse=True) 
-            #     top_5_idxs = [i[0] for i in indexed[:5]]
-            #     top_5_chars = [np.eye(dataset.n_chars)[i] for i in top_5_idxs]
-                
-            #     readable_output = ''.join(dataset.convert(top_5_chars))
-                
-            #     print "input seq: {}".format(readable_x)
-            #     print "predictions:\n{}".format(out)
 
-            i+=1
+                    example = out[0]
+                    #print "example", example
+                    indexed_probs = [sorted([idxed for idxed in enumerate(letter)],
+                                                key=lambda x: x[1], reverse=True) for letter in example]
+                    #print "idxd probs", indexed_probs
+                    top_5_idxs = [i[:5] for i in indexed_probs]
+                    
+                    #print "probs:",indexed_probs
+                    # print "top idxs",top_5_idxs
+
+                    print u"input seq: {}".format(readable_x)
+                    for char, top5 in zip(readable_x, top_5_idxs):
+                        print "'",char,"'"
+                        # print [l for l in top5]
+                        top_out = [u"{0}: {1:.3f}".format(unichr(dataset.convert(l[0])), l[1]) for l in top5]
+                        # print top_out
+                        print u"\t", u" | ".join(top_out).replace("\n", "\\n")
+                        # readable_output = ''.join(chr(char) for char in dataset.convert(letter[0]))
+                        # print "predictions:\n{}".format(readable_output)
+                itr+=1
+        except KeyboardInterrupt:
+            print dataset.plaintext_dataset()
+            import sys;sys.exit(0)
+
     # we need a print function
     # stuff

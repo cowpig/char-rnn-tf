@@ -1,0 +1,6 @@
+TODO:
+- add dropout
+- encapsulate character conversion in the data module (should not have to call unichr on output)
+- save model params
+- separate train, valid, and testing phases
+- GPU training?
