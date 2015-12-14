@@ -28,6 +28,7 @@ class LSTM(object):
     def get_params(self):
         w_f, w_i, w_c, w_o = tf.split(1, 4, self.w)
         b_f, b_i, b_c, b_o = tf.split(1, 4, self.b)
+        return zip([(w_f, w_i, w_c, w_o), (b_f, b_i, b_c, b_o)])
 
     def build_layer(self, x_in, state, scope="lstm_cell", dropout=0.0):
         # print (x_in, c_in, h_in, scope)
@@ -48,14 +49,18 @@ class LSTM(object):
                                                                     dtype=tf.float32)
             x_h_concat = tf.concat(2, [ones_for_bias, x_with_h])
 
+            #xw_plus_b = tf.sum(tf.batch_matmul(x_h_concat, self.w), self.b)
+            z = tf.nn.xw_plus_b(x_h_ocncat, self.w, self.b)
+            z_f, z_i, z_c, z_o = tf.split(1, 4, z)
+
             # forget gate layer
             # print "w_f: ", self.w_f.get_shape()
             # print "x_h_concat: ", x_h_concat.get_shape()
-            f = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_f))
+            f = tf.sigmoid(tf.batch_matmul(z_f))
 
             # candidate values
-            i = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_i))
-            candidate_c = tf.tanh(tf.batch_matmul(x_h_concat, self.w_c))
+            i = tf.sigmoid(z_i)
+            candidate_c = tf.tanh(tf.batch_matmul(z_c))
 
             # new cell state (hidden)
             # forget old values of c
@@ -65,7 +70,7 @@ class LSTM(object):
             c = tf.add(old_c_to_keep, new_c_to_keep)
 
             # new scaled output
-            o = tf.sigmoid(tf.batch_matmul(x_h_concat, self.w_o))
+            o = tf.sigmoid(z_o)
             h = tf.mul(o, tf.tanh(c))
 
             if self.dropout:
