@@ -1,13 +1,19 @@
 import numpy as np
 
+def decode_encoding(str_in, encoding='utf8'):
+    return str_in.decode(encoding)
+
+
 class DataSet(object):
-    def __init__(self, filename, max_chars=-1):
-        self.text = open(filename).read().decode('utf8')[:max_chars]
-        ords = [ord(char) for char in self.text]
-        self.all_chars = list(set(ords))
-        self.char_idx_map = {ordinal : i for i, ordinal in enumerate(self.all_chars)}
+    def __init__(self, filename, max_chars=-1, decoding_fx=str):
+        self.text = decoding_fx( open(filename).read() )[:max_chars]
+        chars = [char for char in self.text]
+        self.all_chars = list(set(chars))
+        print "chars", self.all_chars
+        self.char_idx_map = {char : i for i, char in enumerate(self.all_chars)}
+        print "mapped", self.char_idx_map
         self.idx_to_char_map = {v: k for k,v in self.char_idx_map.iteritems()}
-        self.data = np.array([self.char_idx_map[o] for o in ords])
+        self.data = np.array([self.char_idx_map[c] for c in chars])
 
         valid_idx = int(len(self.data) * 0.6)
         test_idx = int(len(self.data) * 0.8)
@@ -41,15 +47,23 @@ class DataSet(object):
             y = np.eye(self.n_chars)[self.data[idx+1:idx+steps+1]]
             yield(x, y)
 
-    def convert(self, ords):
-        if type(ords) is int:
-            return self.idx_to_char_map[ords]
-        return [self.idx_to_char_map[o] for o in ords]
+    def convert(self, idx):
+        if type(idx) is int:
+            return self.idx_to_char_map[idx]
+        return [self.idx_to_char_map[i] for i in idx]
 
     def data_to_ords(self, data):
         'takes a list of one-hot vectors and returns them as a list of indices'
         if not hasattr(self, 'reverser'):
             self.reverser = np.array(range(self.n_chars))
         if (type(data[0]) is list) or (type(data[0] is np.array)):
-            return np.array([np.sum(self.reverser * data[i]) for i in xrange(len(data))])
+            return np.array([np.sum(self.reverser * d) for d in data])
         return sum(self.reverser * data)
+
+if __name__ == "__main__":
+    d = DataSet(filename='todo.txt', decoding_fx=str)
+    txt = d.plaintext_dataset()
+    print 'plaintext', txt
+    print
+    #for (x,y) in d.yield_examples():
+        #print 'x ',x,' and y ',y
