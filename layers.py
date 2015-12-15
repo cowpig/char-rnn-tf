@@ -77,14 +77,14 @@ class FullyConnected(object):
                             name="w", trainable=True)
         self.b = tf.Variable(tf.zeros([output_size]), name="b", trainable=True)
 
-    def build_layer(self, x_in, activation=tf.sigmoid, scope="fully_connected_layer", 
-                                                                        dropout=0.0):
+    def build_layer(self, x_in, activation=tf.sigmoid,
+                    scope="fully_connected_layer", dropout=0.0):
         with tf.variable_scope(scope):
             # print 'x', x_in.get_shape()
             # print 'w', self.w.get_shape()
             # print 'b', self.b.get_shape()
             out = activation(tf.nn.xw_plus_b(x_in, self.w, self.b))
             if dropout:
-                return tf.nn.dropout(out, 1-dropout, self.seed)
+                return tf.nn.dropout(out, 1-dropout, seed=self.seed)
             else:
                 return out

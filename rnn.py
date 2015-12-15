@@ -11,7 +11,8 @@ def get_state_size(config):
     return size
 
 def cross_entropy(observed, actual):
-    return -tf.reduce_sum(actual*tf.log(observed))
+    # bound values by clipping to avoid nan
+    return -tf.reduce_sum(actual*tf.log(tf.clip_by_value(observed,1e-10,1.0)))
 
 def build_graph(config):
      ######################################
@@ -73,7 +74,7 @@ def build_graph(config):
                 c, h = layer['object'].build_layer(x_in=h, state=state, scope=scope)
                 state = tf.concat(1, [c, h])
             else:
-                h = layer['object'].build_layer(x_in=h, activation=layer['act'], 
+                h = layer['object'].build_layer(x_in=h, activation=layer['act'],
                                                                         scope=scope)
 
         states_out = tf.concat(1, [layer['state'] for layer in layers \
@@ -203,11 +204,11 @@ if __name__ == '__main__':
             }
         ],
         "training" : {
-            "learning_rate" : 0.1,
+            "learning_rate" : 0.01,
             "n_steps" : 4,
             "batch_size" : 2,
             "seed" : 1,
-            "dropout" : 0.5
+            "dropout" : 0.0
         }
     }
     graph = build_graph(config)
@@ -236,14 +237,14 @@ if __name__ == '__main__':
         i=0
         while True:
             x, y  = data_iterator().next()
-            # feed_dict={t['x_in']:x, 
-            #             t['y_in']:y, 
+            # feed_dict={t['x_in']:x,
+            #             t['y_in']:y,
             #             t['states_in']:train_state}
             # for k, v in feed_dict.iteritems():
             #     print k.name, v
-            train_state, cost, _ = sesh.run([t['states_out'], t['cost'], t['train_op']], 
-                                                feed_dict={t['x_in']:x, 
-                                                            t['y_in']:y, 
+            train_state, cost, _ = sesh.run([t['states_out'], t['cost'], t['train_op']],
+                                                feed_dict={t['x_in']:x,
+                                                            t['y_in']:y,
                                                             t['states_in']:train_state})
 
             # print tf.Graph().get_operations()
@@ -252,13 +253,13 @@ if __name__ == '__main__':
               print "cost at epoch {}: {}".format(i, cost)
 
             if i % 1000 == 0:
-                x = [1,0,0]
-                test_state = np.zeros([batch_size, get_state_size(config)])
+                x = [ [1,0,0] ]
+                test_state = np.zeros([1, get_state_size(config)])
                 print "testing... starting with {}".format(x)
                 for _ in xrange(5):
-                    test_state, x = sesh.run([test['states_out'], test['y_out']], 
-                                            feed_dict={test['x_in']:x, 
-                                                        test['states_in']:state})
+                    test_state, x = sesh.run([test['states_out'], test['y_out']],
+                                            feed_dict={test['x_in']:x,
+                                                        test['states_in']:test_state})
                     print "...", x
 
             i+=1
