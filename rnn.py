@@ -162,11 +162,11 @@ def build_graph(config):
 
 if __name__ == '__main__':
     def data_iterator():
-        x = np.array([[ [1,0,0],[0,1,0],[0,0,1],[1,0,0]],
-                      [ [1,0,0],[0,1,0],[0,0,1],[1,0,0]] ])
+        x = np.array([[ [1,0,0],[0,1,0],[0,0,1],[1,0,0] ],
+                      [ [0,1,0],[0,0,1],[1,0,0],[0,1,0] ] ])
 
-        y = np.array([[ [1,0,0],[0,1,0],[0,0,1],[1,0,0]],
-                      [ [1,0,0],[0,1,0],[0,0,1],[1,0,0]] ])
+        y = np.array([[ [0,1,0],[0,0,1],[1,0,0],[0,1,0] ],
+                      [ [0,0,1],[1,0,0],[0,1,0],[0,0,1] ] ])
         yield (x, y)
 
     input_size = 3
@@ -185,14 +185,12 @@ if __name__ == '__main__':
                 "type" : LSTM,
                 "input_size": 2,
                 "output_size": 3,
-                "batch_size": batch_size,
                 "name" : "LSTM_1"
             },
             {
                 "type" : LSTM,
                 "input_size": 3,
                 "output_size": input_size,
-                "batch_size": batch_size,
                 "name" : "LSTM_2"
             },
             {
@@ -260,6 +258,6 @@ if __name__ == '__main__':
                     test_state, x = sesh.run([test['states_out'], test['y_out']],
                                             feed_dict={test['x_in']:x,
                                                         test['states_in']:test_state})
-                    print "...", x
+                    print "...", np.around(x, 2)
 
             i+=1

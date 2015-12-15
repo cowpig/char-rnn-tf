@@ -11,48 +11,46 @@ if __name__ == "__main__":
     dataset = data.DataSet('./data/edgar.txt')
     # dataset.idx['train'] = (0,320)
 
-    n_steps = 16
-    batch_size = 1 # data module has no support for batches yet
     input_size = dataset.n_chars
-    learning_rate=0.001
-
+    n_steps = 16
+    batch_size = 1
+    n_hidden = 100
     config = {
         "layers" : [
             {
                 "type" : FullyConnected,
                 "input_size" : input_size,
-                "output_size": 2,
+                "output_size": n_hidden,
                 "activation" : tf.nn.sigmoid,
                 "name" : 'embedding'
             },
             {
                 "type" : LSTM,
-                "input_size": 2,
-                "output_size": 3,
-                "batch_size": batch_size,
-                "name" : "LSTM_1"
+                "input_size": n_hidden,
+                "output_size": n_hidden,
+                "name": "LSTM_1"
             },
             {
                 "type" : LSTM,
-                "input_size": 3,
-                "output_size": input_size,
-                "batch_size": batch_size,
+                "input_size": n_hidden,
+                "output_size": n_hidden,
                 "name" : "LSTM_2"
             },
             {
                 "type" : FullyConnected,
-                "input_size" : input_size,
+                "input_size" : n_hidden,
                 "output_size": input_size,
                 "activation" : tf.nn.softmax,
                 "name" : "softmax"
             }
         ],
+
         "training" : {
             "learning_rate" : 0.01,
             "n_steps" : n_steps,
             "batch_size" : batch_size,
             "seed" : 1,
-            "dropout" : 0.0
+            "dropout" : 0.3
         }
     }
 
