@@ -50,7 +50,7 @@ class LSTM(object):
             x_h_concat = tf.concat(2, [ones_for_bias, x_with_h])
 
             #xw_plus_b = tf.sum(tf.batch_matmul(x_h_concat, self.w), self.b)
-            z = tf.nn.xw_plus_b(x_h_ocncat, self.w, self.b)
+            z = tf.nn.xw_plus_b(x_h_concat, self.w, self.b)
             z_f, z_i, z_c, z_o = tf.split(1, 4, z)
 
             # forget gate layer
@@ -73,17 +73,23 @@ class LSTM(object):
             o = tf.sigmoid(z_o)
             h = tf.mul(o, tf.tanh(c))
 
-            if self.dropout:
-                h = tf.nn.dropout(h, self.dropout, seed=self.seed)
+            if dropout:
+                h = tf.nn.dropout(h, 1-dropout, seed=self.seed)
 
             return (c, h)
 
+
 class FullyConnected(object):
     def __init__(self, input_size, output_size, w=None, b=None, seed=1):
-        w = tf.Variable(tf.random_normal([shape[1].value]*2, seed=seed), 
+        self.seed = seed
+        w = tf.Variable(tf.random_normal((input_size, output_size), seed=seed), 
                             name="w", trainable=True)
         b = tf.Variable(tf.zeros([output_size]), name="b", trainable=True)
 
-    def build_layer(x_in, scope="fully_connected_layer"):
+    def build_layer(x_in, activation=tf.sigmoid, scope="fully_connected_layer", dropout=0.0):
         with tf.variable_scope(scope):
-            return activation(tf.nn.xw_plus_b(var_in, w, b))
+            out = activation(tf.nn.xw_plus_b(var_in, w, b))
+            if dropout:
+                return tf.nn.dropout(out, 1-dropout, self.seed)
+            else:
+                return out

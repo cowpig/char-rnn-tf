@@ -1,9 +1,6 @@
 import tensorflow as tf
 import numpy as np
 
-def cross_entropy(observed, actual):
-    return -tf.reduce_sum(actual*tf.log(observed))
-
 
 def train(dataset, starting_state, x_in, y_in, states_in, states_out, 
                                                 y_out, costs, train_op):

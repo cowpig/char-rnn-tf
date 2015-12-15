@@ -1,123 +1,150 @@
 import tensorflow as tf
 import numpy as np
-import layers
+from layers import LSTM, FullyConnected
 
-def build_graph(hyperparams, n_steps, batch_size, stack_size, seed=1):
-    cells = []
-    for i in xrange(stack_size):
-        with tf.variable_scope("Cell_{}".format(i)):
-            cells.append(LSTM(**hyperparams[i]))
+def cross_entropy(observed, actual):
+    return -tf.reduce_sum(actual*tf.log(observed))
 
-    # states handle both h_in and c_in
-    total_state_size = sum([param['output_size']*2 for param in hyperparams])
+def build_graph(config):
+     ######################################
+    # PREPARE VARIABLES & HYPERPARAMETERS
+    total_state_size = sum([layer['output_size']*2 for layer in config['layers'] \
+                                            if isinstance(layer['type'], LSTM)])
+
+    batch_size = config['training']['batch_size']
+    n_steps = config['training']['n_steps']
+    seed = config['training']['seed']
+    x_size = config['layers'][0]['input_size']
+    y_size = config['layers'][-1]['output_size']
+
+    ######################################
+    # PREPARE LAYERS
+    n=0
+    layers = []
+    next_size = x_size
+    for layer in config['layers']:
+        assert(next_size == layer['input_size'])
+        w = layer['w'] if 'w' in layer else None
+        b = layer['b'] if 'b' in layer else None
+        next_size = layer['output_size']
+        scope = layer['name']
+        with tf.variable_scope(scope):
+            layers.append({
+                'scope': scope,
+                'object': layer['type'](layer['input_size'], next_size, w, b, seed),
+            })
+        if layer['type'] is LSTM:
+            m = layer['output_size']*2
+            layers[-1]['state_idx'] = (n, m)
+            n = m
+        elif layer['type'] is FullyConnected:
+            layers[-1]['act'] = layer['activation']
+
+    #######################################
+    # TESTING
+
+    states_in = tf.placeholder(tf.float32, name="states_in", shape=(total_state_size))
+    x_in = tf.placeholder(tf.float32, name="x", shape=(x_size))
+    y_in = tf.placeholder(tf.float32, name="y", shape=(y_size))
+
+    for layer in layers:
+        if isinstance(layer['object'], LSTM):
+            n, m = layer['state_idx']
+            layer['state'] = (tf.slice(states_in, [n], [m]))
+
+    h = x_in
+    with tf.variable_scope("test"):
+        for i, layer in enumerate(layers):
+            # print 'out ', out.get_shape
+            scope = layer['scope']
+            if isinstance(layer['object'], LSTM):
+                state = layer['state']
+                c, h = layer['object'].build_layer(x_in=h, state=state, scope=scope)
+                state = tf.concat(0, [c, h])
+            else:
+                h = layer['object'].build_layer(x_in=h, activation=layer['act'], 
+                                                                        scope=scope)
+
+        states_out = tf.concat(0, [layer['state'] for layer in layers \
+                                if isinstance(layer['object'], LSTM)])
+        cost = cross_entropy(h, y_in)
+
+    testing = {
+        "x_in" : x_in,
+        "y_in" : y_in,
+        "states_in" : states_in,
+        "states_out" : states_out,
+        "y_out" : h,
+        "cost" : cost
+    }
+
+
+    #######################################
+    # TRAINING
+
     states_in = tf.placeholder(tf.float32, name="states_in",
-                                shape=(batch_size, 1, total_state_size))
+                                shape=(batch_size,1,total_state_size))
     x_in = tf.placeholder(tf.float32, name="x",
-                                shape=(batch_size,n_steps,cells[0].input_size))
+                                shape=(batch_size,n_steps,x_size))
     y_in = tf.placeholder(tf.float32, name="y",
-                                shape=(batch_size,n_steps,cells[-1].output_size))
+                                shape=(batch_size,n_steps,y_size))
 
+    for layer in layers:
+        if isinstance(layer['object'], LSTM):
+            n, m = layer['state_idx']
+            layer['state'] = (tf.slice(states_in, [0,0,n], [-1,-1,m]))
 
     y_arr = []
-    states = []
-    n=0
-    for cell in cells:
-        m = cell.output_size*2
-        states.append(tf.slice(states_in, [0,0,n], [-1,-1,m]))
-        n = m
+    with tf.variable_scope("train"):
+        for t in xrange(n_steps):
+            if t>0:
+                tf.get_variable_scope().reuse_variables()
+            x_at_t = tf.slice(x_in, [0, t, 0], [-1, 1, -1])
+            h = x_at_t
+            for i, layer in enumerate(layers):
+                if i > len(layers):
+                    d = 0.0
+                else:
+                    d = config['training']['dropout']
 
-    for t in xrange(n_steps):
-        next_states = []
-        # print "x_in", x_in.get_shape()
-        x_at_t = tf.slice(x_in, [0, t, 0], [-1, 1, -1])
-        out = x_at_t
-        for i, cell in enumerate(cells):
-            # print 'x ', x.get_shape
-            # print 'h ', h_arr[i].get_shape()
-            # print 'c ', c_arr[i].get_shape()
+                scope = layer['scope']
+                if isinstance(layer['object'], LSTM):
+                    state = layer['state']
+                    c, h = layer['object'].build_layer(x_in=h, state=state, 
+                                                        scope=scope, dropout=d)
+                    state = tf.concat(0, [c, h])
+                else:
+                    h = layer['object'].build_layer(x_in=h, scope=scope, dropout=d,
+                                                            activation=layer['act'])
+            y_arr.append(h)
 
-            c, out = cell.build_layer(x_in=out, state=states[i],
-                                    scope="Cell_{}_t_{}".format(i,t))
-            next_states.append(tf.concat(2, [c, out]))
+        states_out = tf.concat(0, [layer['state'] for layer in layers \
+                                if isinstance(layer['object'], LSTM)])
+        y_out = tf.concat(1, y_arr)
+        cost = cross_entropy(y_out, y_in)
 
-        states = next_states
+        cost = cross_entropy(y_out, y_in)
+        tvars = tf.trainable_variables()
+        grads = tf.gradients(costs, tvars)
+        optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
+        train_op = optimus_prime.apply_gradients(zip(grads, tvars))
 
-        # final_1 = fully_connected_layer(tf.squeeze())
-        final = fully_connected_layer(tf.squeeze(out, [1]), activation=tf.identity, 
-                                                scope="fully_conn_t{}".format(t))
-        # print "out: ", out.get_shape()
-        vec = tf.nn.softmax(final)
-        y_arr.append(tf.expand_dims(vec, 1))
-
-    y_out = tf.concat(1, y_arr)
-    states_out = tf.concat(2, states)
-    # print "y_out: ", y_out.get_shape()
-    # print "y_in: ", y_in.get_shape()
-    cost = cross_entropy(y_out, y_in)
-
-    return {
+    training = {
         'x_in': x_in,
         'y_in': y_in,
         'states_in': states_in,
         'states_out': states_out,
-        'y_out': y_out,
-        'cost' : cost
+        'cost' : cost,
+        'train_op': train_op
     }
 
-
-def initial_state(hyperparams):
-    total_state_size = sum([param['output_size']*2 for param in hyperparams])
-    return np.zeros((hyperparams[0]['batch_size'], 1, total_state_size))
-
+    return {
+        'train' : training,
+        'test' : testing
+    }
 
 
 if __name__ == '__main__':
-    config = {
-        "model" : {
-            "layers" : [
-                {
-                    "type" : layers.FullyConnected,
-                    "input_size" : input_size,
-                    "output_size": input_size,
-                    "activation" : tf.nn.sigmoid
-                },
-                {
-                    "type" : layers.LSTM,
-                    "input_size": input_size,
-                    "output_size": 8,
-                    "batch_size": batch_size,
-                },
-                {
-                    "type" : layers.LSTM,
-                    "input_size": 8,
-                    "output_size": input_size,
-                    "batch_size": batch_size,
-                },
-                {
-                    "type" : layers.FullyConnected,
-                    "input_size" : input_size,
-                    "output_size": input_size,
-                    "activation" : tf.nn.softmax
-                }
-            ]
-        }
-        "training" : {
-            "learning_rate" : 0.1,
-            "n_steps" : 4,
-            "batch_size" : 1,
-            "cost" : cross_entropy
-        }
-    }
-
-    state_0 = initial_state(params)
-
-    x_in, y_in, states_in, states_out, y_out, costs = build_graph(params, n_steps, batch_size, stack_size)
-
-    tvars = tf.trainable_variables()
-    grads = tf.gradients(costs, tvars)
-    optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
-    train_op = optimus_prime.apply_gradients(zip(grads, tvars))
-
     def data_iterator():
         x = np.array([[ [1,0,0],[0,1,0],[0,0,1],[1,0,0]],
                       [ [1,0,0],[0,1,0],[0,0,1],[1,0,0]] ])
@@ -125,5 +152,88 @@ if __name__ == '__main__':
         y = np.array([[ [1,0,0],[0,1,0],[0,0,1],[1,0,0]],
                       [ [1,0,0],[0,1,0],[0,0,1],[1,0,0]] ])
         yield (x, y)
+    input_size = 3
+    n_steps = 4
+    batch_size = 2
+    config = {
+        "layers" : [
+            {
+                "type" : FullyConnected,
+                "input_size" : input_size,
+                "output_size": 2,
+                "activation" : tf.nn.sigmoid,
+                "name" : 'embedding'
+            },
+            {
+                "type" : LSTM,
+                "input_size": 2,
+                "output_size": 8,
+                "batch_size": batch_size,
+                "name" : "LSTM_1"
+            },
+            {
+                "type" : LSTM,
+                "input_size": 8,
+                "output_size": input_size,
+                "batch_size": batch_size,
+                "name" : "LSTM_2"
+            },
+            {
+                "type" : FullyConnected,
+                "input_size" : input_size,
+                "output_size": input_size,
+                "activation" : tf.nn.softmax,
+                "name" : "softmax"
+            }
+        ],
+        "training" : {
+            "learning_rate" : 0.1,
+            "n_steps" : 4,
+            "batch_size" : 1,
+            "seed" : 1,
+            "dropout" : 0.3
+        }
+    }
+    graph = build_graph(config)
 
-    train(data_iterator, state_0, x_in, y_in, states_in, states_out, y_out, costs, train_op)
+    with tf.Session() as sesh:
+        # logger = tf.train.SummaryWriter('./log', sesh.graph_def)
+        # pylogger = tf.python.training.summary_io.SummaryWriter('./pylog', sesh.graph_def)
+
+        sesh.run(tf.initialize_all_variables())
+        t = graph['train']
+        train_state = tf.zeros(tf.concat(1, [t['x_in']]*2).get_shape())
+
+        # tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
+
+
+
+        # training = {
+        #     'x_in': x_in,
+        #     'y_in': y_in,
+        #     'states_in': states_in,
+        #     'states_out': states_out,
+        #     'cost' : cost,
+        #     'train_op': train_op
+        # }
+
+        cost = np.inf
+
+        i=0
+        while True:
+            for step, (x, y) in enumerate(dataset()):
+                train_state, out, cost, _ = sesh.run([t['states_out'], t['y_out'],
+                                                         t['costs'], t['train_op']], 
+                                        feed_dict={t['x_in']:x, 
+                                                    t['y_in']:y, 
+                                                    t['states_in']:train_state})
+
+                # print tf.Graph().get_operations()
+
+            if i % 100 == 0:
+              print "cost at epoch {}: {}".format(i, cost)
+
+            if i % 1000 == 0:
+              print "predictions:\n{}".format(out)
+
+            i+=1

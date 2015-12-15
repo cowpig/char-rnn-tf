@@ -24,7 +24,6 @@ if __name__ == '__main__':
         "input_size": input_size,
         "output_size": input_size,
         "batch_size": batch_size,
-
     }]
 
 
