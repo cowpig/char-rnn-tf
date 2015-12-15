@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 
 if __name__ == "__main__":
-    dataset = data.DataSet('./data/dum.txt')
+    dataset = data.DataSet('./data/edgar.txt')
     # dataset.idx['train'] = (0,320)
 
     n_steps = 16
