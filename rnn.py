@@ -58,11 +58,13 @@ def build_graph(config):
             # print 'out ', out.get_shape
             scope = layer['scope']
             if isinstance(layer['object'], LSTM):
+		print "LSTM!"
                 state = layer['state']
                 c, h = layer['object'].build_layer(x_in=h, state=state, scope=scope)
                 state = tf.concat(0, [c, h])
             else:
-                h = layer['object'].build_layer(x_in=h, activation=layer['act'], 
+                print "not LSTM" 
+		h = layer['object'].build_layer(x_in=h, activation=layer['act'], \
                                                                         scope=scope)
 
         states_out = tf.concat(0, [layer['state'] for layer in layers \

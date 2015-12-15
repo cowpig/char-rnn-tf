@@ -82,13 +82,16 @@ class LSTM(object):
 class FullyConnected(object):
     def __init__(self, input_size, output_size, w=None, b=None, seed=1):
         self.seed = seed
-        w = tf.Variable(tf.random_normal((input_size, output_size), seed=seed), 
+        self.w = tf.Variable(tf.random_normal((input_size, output_size), seed=seed), 
                             name="w", trainable=True)
-        b = tf.Variable(tf.zeros([output_size]), name="b", trainable=True)
+        self.b = tf.Variable(tf.zeros([output_size]), name="b", trainable=True)
 
-    def build_layer(x_in, activation=tf.sigmoid, scope="fully_connected_layer", dropout=0.0):
+    def build_layer(self, x_in, activation=tf.sigmoid, scope="fully_connected_layer", dropout=0.0):
         with tf.variable_scope(scope):
-            out = activation(tf.nn.xw_plus_b(var_in, w, b))
+	    print "x",x_in
+	    print "w",self.w.get_shape()
+	    print "b",self.b.get_shape()
+            out = activation(tf.nn.xw_plus_b(tf.expand_dims(x_in,0), self.w, tf.expand_dims(self.b)))
             if dropout:
                 return tf.nn.dropout(out, 1-dropout, self.seed)
             else:
