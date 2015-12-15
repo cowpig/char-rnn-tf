@@ -2,17 +2,27 @@ import tensorflow as tf
 import numpy as np
 from layers import LSTM, FullyConnected
 
+def get_state_size(config):
+    size = 0
+    for layer in config['layers']:
+        if layer['type'] is LSTM:
+            size += layer['output_size'] * 2
+
+    return size
+
 def cross_entropy(observed, actual):
     return -tf.reduce_sum(actual*tf.log(observed))
 
 def build_graph(config):
      ######################################
     # PREPARE VARIABLES & HYPERPARAMETERS
-    total_state_size = sum([layer['output_size']*2 for layer in config['layers'] \
-                                            if isinstance(layer['type'], LSTM)])
+    total_state_size = get_state_size(config)
+
+    print 'total_state_size', total_state_size
 
     batch_size = config['training']['batch_size']
     n_steps = config['training']['n_steps']
+    learning_rate = config['training']['learning_rate']
     seed = config['training']['seed']
     x_size = config['layers'][0]['input_size']
     y_size = config['layers'][-1]['output_size']
@@ -43,17 +53,17 @@ def build_graph(config):
     #######################################
     # TESTING
 
-    states_in = tf.placeholder(tf.float32, name="states_in", shape=(1, total_state_size))
-    x_in = tf.placeholder(tf.float32, name="x", shape=(1, x_size))
-    y_in = tf.placeholder(tf.float32, name="y", shape=(1, y_size))
-
-    for layer in layers:
-        if isinstance(layer['object'], LSTM):
-            n, m = layer['state_idx']
-            layer['state'] = (tf.slice(states_in, [0, n], [-1, m]))
-
-    h = x_in
     with tf.variable_scope("test"):
+        states_in = tf.placeholder(tf.float32, name="states_in", shape=(1, total_state_size))
+        x_in = tf.placeholder(tf.float32, name="x", shape=(1, x_size))
+        y_in = tf.placeholder(tf.float32, name="y", shape=(1, y_size))
+
+        for layer in layers:
+            if isinstance(layer['object'], LSTM):
+                n, m = layer['state_idx']
+                layer['state'] = tf.slice(states_in, [0, n], [-1, m])
+
+        h = x_in
         for i, layer in enumerate(layers):
             # print 'h', h.get_shape()
             # print layer
@@ -83,20 +93,20 @@ def build_graph(config):
     #######################################
     # TRAINING
 
-    states_in = tf.placeholder(tf.float32, name="states_in",
-                                shape=(batch_size,total_state_size))
-    x_in = tf.placeholder(tf.float32, name="x",
-                                shape=(batch_size,n_steps,x_size))
-    y_in = tf.placeholder(tf.float32, name="y",
-                                shape=(batch_size,n_steps,y_size))
-
-    for layer in layers:
-        if isinstance(layer['object'], LSTM):
-            n, m = layer['state_idx']
-            layer['state'] = (tf.slice(states_in, [0,n], [-1,m]))
-
-    y_arr = []
     with tf.variable_scope("train"):
+        y_arr = []
+        states_in = tf.placeholder(tf.float32, name="states_in",
+                                    shape=(batch_size,total_state_size))
+        x_in = tf.placeholder(tf.float32, name="x",
+                                    shape=(batch_size,n_steps,x_size))
+        y_in = tf.placeholder(tf.float32, name="y",
+                                    shape=(batch_size,n_steps,y_size))
+
+        for layer in layers:
+            if isinstance(layer['object'], LSTM):
+                n, m = layer['state_idx']
+                layer['state'] = tf.slice(states_in, [0,n], [-1,m])
+
         for t in xrange(n_steps):
             if t>0:
                 tf.get_variable_scope().reuse_variables()
@@ -138,6 +148,7 @@ def build_graph(config):
         'y_in': y_in,
         'states_in': states_in,
         'states_out': states_out,
+        'y_out' : y_out,
         'cost' : cost,
         'train_op': train_op
     }
@@ -156,6 +167,7 @@ if __name__ == '__main__':
         y = np.array([[ [1,0,0],[0,1,0],[0,0,1],[1,0,0]],
                       [ [1,0,0],[0,1,0],[0,0,1],[1,0,0]] ])
         yield (x, y)
+
     input_size = 3
     n_steps = 4
     batch_size = 2
@@ -193,9 +205,9 @@ if __name__ == '__main__':
         "training" : {
             "learning_rate" : 0.1,
             "n_steps" : 4,
-            "batch_size" : 1,
+            "batch_size" : 2,
             "seed" : 1,
-            "dropout" : 0.3
+            "dropout" : 0.5
         }
     }
     graph = build_graph(config)
@@ -206,7 +218,8 @@ if __name__ == '__main__':
 
         sesh.run(tf.initialize_all_variables())
         t = graph['train']
-        train_state = tf.zeros(tf.concat(1, [t['x_in']]*2).get_shape())
+        test = graph['test']
+        train_state = np.zeros([batch_size, get_state_size(config)])
 
         # tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
 
@@ -220,22 +233,32 @@ if __name__ == '__main__':
         # }
 
         cost = np.inf
-
         i=0
         while True:
-            for step, (x, y) in enumerate(dataset()):
-                train_state, out, cost, _ = sesh.run([t['states_out'], t['y_out'],
-                                                         t['costs'], t['train_op']], 
-                                        feed_dict={t['x_in']:x, 
-                                                    t['y_in']:y, 
-                                                    t['states_in']:train_state})
+            x, y  = data_iterator().next()
+            # feed_dict={t['x_in']:x, 
+            #             t['y_in']:y, 
+            #             t['states_in']:train_state}
+            # for k, v in feed_dict.iteritems():
+            #     print k.name, v
+            train_state, cost, _ = sesh.run([t['states_out'], t['cost'], t['train_op']], 
+                                                feed_dict={t['x_in']:x, 
+                                                            t['y_in']:y, 
+                                                            t['states_in']:train_state})
 
-                # print tf.Graph().get_operations()
+            # print tf.Graph().get_operations()
 
             if i % 100 == 0:
               print "cost at epoch {}: {}".format(i, cost)
 
             if i % 1000 == 0:
-              print "predictions:\n{}".format(out)
+                x = [1,0,0]
+                test_state = np.zeros([batch_size, get_state_size(config)])
+                print "testing... starting with {}".format(x)
+                for _ in xrange(5):
+                    test_state, x = sesh.run([test['states_out'], test['y_out']], 
+                                            feed_dict={test['x_in']:x, 
+                                                        test['states_in']:state})
+                    print "...", x
 
             i+=1
