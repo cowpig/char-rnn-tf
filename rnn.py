@@ -43,31 +43,30 @@ def build_graph(config):
     #######################################
     # TESTING
 
-    states_in = tf.placeholder(tf.float32, name="states_in", shape=(total_state_size))
-    x_in = tf.placeholder(tf.float32, name="x", shape=(x_size))
-    y_in = tf.placeholder(tf.float32, name="y", shape=(y_size))
+    states_in = tf.placeholder(tf.float32, name="states_in", shape=(1, total_state_size))
+    x_in = tf.placeholder(tf.float32, name="x", shape=(1, x_size))
+    y_in = tf.placeholder(tf.float32, name="y", shape=(1, y_size))
 
     for layer in layers:
         if isinstance(layer['object'], LSTM):
             n, m = layer['state_idx']
-            layer['state'] = (tf.slice(states_in, [n], [m]))
+            layer['state'] = (tf.slice(states_in, [0, n], [-1, m]))
 
     h = x_in
     with tf.variable_scope("test"):
         for i, layer in enumerate(layers):
-            # print 'out ', out.get_shape
+            # print 'h', h.get_shape()
+            # print layer
             scope = layer['scope']
             if isinstance(layer['object'], LSTM):
-		print "LSTM!"
                 state = layer['state']
                 c, h = layer['object'].build_layer(x_in=h, state=state, scope=scope)
-                state = tf.concat(0, [c, h])
+                state = tf.concat(1, [c, h])
             else:
-                print "not LSTM" 
-		h = layer['object'].build_layer(x_in=h, activation=layer['act'], \
+                h = layer['object'].build_layer(x_in=h, activation=layer['act'], 
                                                                         scope=scope)
 
-        states_out = tf.concat(0, [layer['state'] for layer in layers \
+        states_out = tf.concat(1, [layer['state'] for layer in layers \
                                 if isinstance(layer['object'], LSTM)])
         cost = cross_entropy(h, y_in)
 
@@ -85,7 +84,7 @@ def build_graph(config):
     # TRAINING
 
     states_in = tf.placeholder(tf.float32, name="states_in",
-                                shape=(batch_size,1,total_state_size))
+                                shape=(batch_size,total_state_size))
     x_in = tf.placeholder(tf.float32, name="x",
                                 shape=(batch_size,n_steps,x_size))
     y_in = tf.placeholder(tf.float32, name="y",
@@ -94,7 +93,7 @@ def build_graph(config):
     for layer in layers:
         if isinstance(layer['object'], LSTM):
             n, m = layer['state_idx']
-            layer['state'] = (tf.slice(states_in, [0,0,n], [-1,-1,m]))
+            layer['state'] = (tf.slice(states_in, [0,n], [-1,m]))
 
     y_arr = []
     with tf.variable_scope("train"):
@@ -102,8 +101,11 @@ def build_graph(config):
             if t>0:
                 tf.get_variable_scope().reuse_variables()
             x_at_t = tf.slice(x_in, [0, t, 0], [-1, 1, -1])
-            h = x_at_t
+            h = tf.squeeze(x_at_t, [1])
+            # print 't', t
             for i, layer in enumerate(layers):
+                # print 'h', h.get_shape()
+                # print layer
                 if i > len(layers):
                     d = 0.0
                 else:
@@ -114,20 +116,20 @@ def build_graph(config):
                     state = layer['state']
                     c, h = layer['object'].build_layer(x_in=h, state=state, 
                                                         scope=scope, dropout=d)
-                    state = tf.concat(0, [c, h])
+                    state = tf.concat(1, [c, h])
                 else:
+
                     h = layer['object'].build_layer(x_in=h, scope=scope, dropout=d,
                                                             activation=layer['act'])
-            y_arr.append(h)
+            y_arr.append(tf.expand_dims(h, 1))
 
-        states_out = tf.concat(0, [layer['state'] for layer in layers \
+        states_out = tf.concat(1, [layer['state'] for layer in layers \
                                 if isinstance(layer['object'], LSTM)])
         y_out = tf.concat(1, y_arr)
-        cost = cross_entropy(y_out, y_in)
 
         cost = cross_entropy(y_out, y_in)
         tvars = tf.trainable_variables()
-        grads = tf.gradients(costs, tvars)
+        grads = tf.gradients(cost, tvars)
         optimus_prime = tf.train.GradientDescentOptimizer(learning_rate)
         train_op = optimus_prime.apply_gradients(zip(grads, tvars))
 
@@ -169,13 +171,13 @@ if __name__ == '__main__':
             {
                 "type" : LSTM,
                 "input_size": 2,
-                "output_size": 8,
+                "output_size": 3,
                 "batch_size": batch_size,
                 "name" : "LSTM_1"
             },
             {
                 "type" : LSTM,
-                "input_size": 8,
+                "input_size": 3,
                 "output_size": input_size,
                 "batch_size": batch_size,
                 "name" : "LSTM_2"
@@ -207,8 +209,6 @@ if __name__ == '__main__':
         train_state = tf.zeros(tf.concat(1, [t['x_in']]*2).get_shape())
 
         # tf.train.write_graph(sesh.graph_def, './graph', 'rnn_graph.pbtxt')
-
-
 
         # training = {
         #     'x_in': x_in,
