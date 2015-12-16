@@ -2,6 +2,33 @@ import tensorflow as tf
 import numpy as np
 from layers import LSTM, FullyConnected
 
+def print_score(sesh, config, graph, dataset, mode="valid", n_to_print=20):
+    costs = []
+    ins = []
+    outs = []
+    state = np.zeros([1, get_state_size(config)])
+
+    for i, (x, y) in enumerate(dataset.yield_examples(dataset=mode)):
+        if i < n_to_print:
+            state, out, cost = sesh.run([graph['states_out'], graph['y_out'], graph['cost']],
+                                    feed_dict={ graph['x_in']:x, 
+                                                graph['states_in']:state,
+                                                graph['y_in']:y })
+            ins.append(x[0])
+            outs.append(out[0])
+        else:
+            state, cost = sesh.run([graph['states_out'], graph['cost']],
+                                    feed_dict={ graph['x_in']:x, 
+                                                graph['states_in']:state,
+                                                graph['y_in']:y })
+        costs.append(cost)
+
+    if n_to_print:
+        dataset.print_model_output(ins, outs)
+
+    print "{} avg cost:\t{}".format(mode, np.mean(costs))
+
+
 def get_state_size(config):
     size = 0
     for layer in config['layers']:

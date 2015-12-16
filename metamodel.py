@@ -7,33 +7,6 @@ import sys
 import os.path
 
 
-def print_score(sesh, config, graph, dataset, mode="valid", n_to_print=20):
-    costs = []
-    ins = []
-    outs = []
-    state = np.zeros([1, rnn.get_state_size(config)])
-
-    for i, (x, y) in enumerate(dataset.yield_examples(dataset=mode)):
-        if i < n_to_print:
-            state, out, cost = sesh.run([graph['states_out'], graph['y_out'], graph['cost']],
-                                    feed_dict={ graph['x_in']:x, 
-                                                graph['states_in']:state,
-                                                graph['y_in']:y })
-            ins.append(x[0])
-            outs.append(out[0])
-        else:
-            state, cost = sesh.run([graph['states_out'], graph['cost']],
-                                    feed_dict={ graph['x_in']:x, 
-                                                graph['states_in']:state,
-                                                graph['y_in']:y })
-        costs.append(cost)
-
-    if n_to_print:
-        dataset.print_model_output(ins, outs)
-
-    print "{} avg cost:\t{}".format(mode, np.mean(costs))
-
-
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         fn = sys.argv[1]
@@ -124,8 +97,11 @@ if __name__ == "__main__":
 
                 print "Avg cost for training epoch {}: {}".format(itr, np.mean(train_costs))
 
-                if itr % 10 == 0:
-                        print_score(sesh, config, test, dataset, mode="valid")
+                if itr % 20 == 0:
+                    rnn.print_score(sesh, config, test, dataset, mode="valid")
+                elif itr % 5 == 0:
+                    rnn.print_score(sesh, config, test, dataset, mode="valid", n_to_print=0)
+
 
                 itr+=1
 
@@ -137,4 +113,4 @@ if __name__ == "__main__":
                     saver.save(sesh, fn)
                     print "model saved at: {}".format(fn)
 
-                    print_score(sesh, config, test, dataset, mode="test")
+                    rnn.print_score(sesh, config, test, dataset, mode="test")
