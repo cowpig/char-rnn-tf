@@ -12,14 +12,12 @@ def get_state_size(config):
 
 def cross_entropy(observed, actual):
     # bound values by clipping to avoid nan
-    return -tf.reduce_sum(actual*tf.log(tf.clip_by_value(observed,1e-10,1.0)))
+    return -tf.reduce_mean(actual*tf.log(tf.clip_by_value(observed,1e-10,1.0)))
 
 def build_graph(config):
      ######################################
     # PREPARE VARIABLES & HYPERPARAMETERS
     total_state_size = get_state_size(config)
-
-    print 'total_state_size', total_state_size
 
     batch_size = config['training']['batch_size']
     n_steps = config['training']['n_steps']

@@ -15,8 +15,8 @@ class DataSet(object):
         self.idx_to_char_map = {v: k for k,v in self.char_idx_map.iteritems()}
         self.data = np.array([self.char_idx_map[c] for c in chars])
 
-        valid_idx = int(len(self.data) * 0.6)
-        test_idx = int(len(self.data) * 0.8)
+        valid_idx = int(len(self.data) * 0.7)
+        test_idx = int(len(self.data) * 0.85)
         #print 'valid', valid_idx
         #print 'test', test_idx
         #print 'end',len(self.data)
@@ -62,6 +62,28 @@ class DataSet(object):
         if (type(data[0]) is list) or (type(data[0] is np.array)):
             return np.array([np.sum(self.reverser * d) for d in data])
         return sum(self.reverser * data)
+
+    def print_model_output(self, inputs, outputs):
+        readable_x = u''.join(self.convert(
+              self.data_to_ords(inputs)))
+
+        def prettify(pair):
+            prob_str = "{:0.3f}".format(np.round(pair[1],3))
+            return (self.convert(pair[0]), unicode(prob_str))
+
+        indexed_probs = [[prettify(l) for l in enumerate(ltrs)] for ltrs in outputs]
+
+        indexed_probs = sorted(indexed_probs, key=lambda x: x[1], reverse=True)
+        
+        # import pdb; pdb.set_trace()
+
+        top_5_idxs = [l[:5] for l in indexed_probs]
+
+        for char, top5 in zip(readable_x, top_5_idxs):
+            print "'",char,"'"
+            top_out = [u"{}: {}".format(*l) for l in top5]
+            print u"\t", u" | ".join(top_out).replace("\n", "\\n")
+
 
 if __name__ == "__main__":
     d = DataSet(filename='todo.txt', decoding_fx=str)

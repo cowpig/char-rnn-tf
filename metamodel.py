@@ -6,55 +6,32 @@ from layers import LSTM, FullyConnected
 import sys
 import os.path
 
-def score(sesh, config, graph, dataset, mode="valid", n_examples=50):
+
+def print_score(sesh, config, graph, dataset, mode="valid", n_to_print=20):
     costs = []
+    ins = []
     outs = []
     state = np.zeros([1, rnn.get_state_size(config)])
 
     for i, (x, y) in enumerate(dataset.yield_examples(dataset=mode)):
-        state, out, cost = sesh.run([graph['states_out'], graph['y_out'], graph['cost']],
+        if i < n_to_print:
+            state, out, cost = sesh.run([graph['states_out'], graph['y_out'], graph['cost']],
+                                    feed_dict={ graph['x_in']:x, 
+                                                graph['states_in']:state,
+                                                graph['y_in']:y })
+            ins.append(x[0])
+            outs.append(out[0])
+        else:
+            state, cost = sesh.run([graph['states_out'], graph['cost']],
                                     feed_dict={ graph['x_in']:x, 
                                                 graph['states_in']:state,
                                                 graph['y_in']:y })
         costs.append(cost)
 
+    if n_to_print:
+        dataset.print_model_output(ins, outs)
 
-
-def generate_text(sesh, config, graph, dataset, mode="valid", n_examples=50):
-    test_cost = 0
-    test_state = np.zeros([1, rnn.get_state_size(config)])
-    print "testing..."
-    inputs = []
-    outputs = []
-    for _ in xrange(30):
-        x, y = testing_generator.next()
-        inputs.append(x[:])
-        test_state, x, cost = sesh.run([test['states_out'],
-                                          test['y_out'],
-                                          test['cost']],
-                                        feed_dict={
-                                            test['x_in']:x,
-                                            test['states_in']:test_state,
-                                            test['y_in']:y})
-        test_cost += cost
-        outputs.append(x[0][:])
-
-        print "Test cost: ", test_cost
-
-        readable_x = u''.join(dataset.convert(
-              dataset.data_to_ords(inputs)))
-        print "input: ", readable_x
-
-        indexed_probs = [sorted([idxed for idxed in enumerate(letter)],
-                                  key=lambda x: x[1], reverse=True)
-                          for letter in outputs]
-        top_5_idxs = [i[:5] for i in indexed_probs]
-
-        for char, top5 in zip(readable_x, top_5_idxs):
-            print "'",char,"'"
-            top_out = [u"{0}: {1:.3f}".format(dataset.convert(l[0]), l[1])
-                        for l in top5]
-            print u"\t", u" | ".join(top_out).replace("\n", "\\n")
+    print "{} avg cost:\t{}".format(mode, np.mean(costs))
 
 
 if __name__ == "__main__":
@@ -135,25 +112,29 @@ if __name__ == "__main__":
 
         while True:
             try:
-                for t, (x,y) in enumerate(dataset.yield_examples(steps=n_steps)):
-                    train_costs = 
+                train_costs = []
+                for step, (x,y) in enumerate(dataset.yield_examples(steps=n_steps)):
                     train_state, cost, _ = sesh.run([t['states_out'], t['cost'], t['train_op']],
                                                   feed_dict={t['x_in']:np.array([x]),
                                                             t['y_in']:np.array([y]),
                                                             t['states_in']:train_state})
-                    if t % 100 == 0:
-                        print "\ttraining cost at epoch {} step {}:\t{}".format(itr, t, cost)
+                    train_costs.append(cost)
+                    # if step % 200 == 0:
+                    #     print "\ttraining cost at epoch {} step {}:\t{}".format(itr, step, cost)
+
+                print "Avg cost for training epoch {}: {}".format(itr, np.mean(train_costs))
 
                 if itr % 10 == 0:
+                        print_score(sesh, config, test, dataset, mode="valid")
 
+                itr+=1
 
-                if itr % 50 == 0:
+            except KeyboardInterrupt:
+                import datetime
+                q = raw_input("Type 'Y' or 'y' to see save model & see test score.")
+                if q.lower() == 'y':
+                    fn = "models/metamodel_{}.ckpt".format(datetime.now().strftime("%m-%d_%H:%M"))
+                    saver.save(sesh, fn)
+                    print "model saved at: {}".format(fn)
 
-
-                      itr+=1
-
-          except KeyboardInterrupt:
-            import datetime
-            fn = "models/metamodel_{}.ckpt".format(datetime.now().strftime("%m-%d_%H:%M"))
-            saver.save(sesh, fn)
-            print "model saved at: {}".format(fn)
+                    print_score(sesh, config, test, dataset, mode="test")
