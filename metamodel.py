@@ -136,6 +136,6 @@ if __name__ == "__main__":
 
           except KeyboardInterrupt:
             import datetime
-            fn = "metamodel_{}.ckpt".format(datetime.now().strftime("%m-%d_%H:%M"))
+            fn = "models/metamodel_{}.ckpt".format(datetime.now().strftime("%m-%d_%H:%M"))
             saver.save(sesh, fn)
             print "model saved at: {}".format(fn)
