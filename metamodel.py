@@ -3,11 +3,23 @@ import data
 import tensorflow as tf
 import numpy as np
 from layers import LSTM, FullyConnected
+import sys
+import os.path
 
 
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        fn = sys.argv[1]
+    else:
+        fn = None
+
+    if fn:
+        if not os.path.isfile(fn):
+            raise Exception("File '{}' does not exist.".format(fn))
+
+
     dataset = data.DataSet('./data/edgar.txt',decoding_fx=data.decode_encoding)
     # dataset.idx['train'] = (0,320)
 
@@ -57,8 +69,12 @@ if __name__ == "__main__":
     graph = rnn.build_graph(config)
 
     with tf.Session() as sesh:
-
         sesh.run(tf.initialize_all_variables())
+
+        saver = tf.train.Saver()
+        if fn:
+            saver.restore(sesh, fn)
+        
         t = graph['train']
         test = graph['test']
         train_state = np.zeros([batch_size, rnn.get_state_size(config)])
@@ -67,6 +83,7 @@ if __name__ == "__main__":
         itr=0
 
         testing_generator = dataset.yield_examples(dataset="test")
+
 
         while True:
           try:
@@ -118,5 +135,7 @@ if __name__ == "__main__":
                   itr+=1
 
           except KeyboardInterrupt:
-              print dataset.plaintext_dataset()
-              import sys;sys.exit(0)
+            import datetime
+            fn = "metamodel_{}.ckpt".format(datetime.now().strftime("%m-%d_%H:%M"))
+            saver.save(sesh, fn)
+            print "model saved at: {}".format(fn)
