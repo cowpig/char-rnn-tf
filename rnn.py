@@ -37,8 +37,6 @@ def riff(fn, config, dataset):#, n_examples=50):
 
     graph = build_graph(config)
     r = graph['test']
-    #with tf.Session() as sesh:
-        #sesh.run(tf.initialize_all_variables)
 
     saver = tf.train.Saver()
 
@@ -55,7 +53,6 @@ def riff(fn, config, dataset):#, n_examples=50):
         try:
             while True:
                 x = np.eye(dataset.n_chars+2)[x_idx]
-                print dataset.idx_to_one_hot(x_idx)
                 outputs, riff_state = sesh.run( [r['y_out'], r['states_out']],
                                         feed_dict={r['x_in']:np.array([x]),
                                                     r['states_in']:riff_state} )
