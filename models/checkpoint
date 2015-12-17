@@ -1,0 +1,2 @@
+model_checkpoint_path: "models/metamodel-12-16_19h03.ckpt"
+all_model_checkpoint_paths: "models/metamodel-12-16_19h03.ckpt"

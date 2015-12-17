@@ -1,7 +1,6 @@
 data/*
 *.pyc
 data
-models/*
 log/*
 pylog/*
 graph/*

@@ -56,11 +56,11 @@ if __name__ == "__main__":
         ],
 
         "training" : {
-            "learning_rate" : 0.01,
+            "learning_rate" : 0.1,
             "n_steps" : n_steps,
             "batch_size" : batch_size,
             "seed" : 1,
-            "dropout" : 0.3
+            "dropout" : 0.4
         }
     }
 
@@ -107,10 +107,11 @@ if __name__ == "__main__":
 
             except KeyboardInterrupt:
                 import datetime
-                q = raw_input("Type 'Y' or 'y' to see save model & see test score.")
+                q = raw_input("Type 'Y' or 'y' to see save model & see test score:\n")
                 if q.lower() == 'y':
-                    fn = "models/metamodel_{}.ckpt".format(datetime.now().strftime("%m-%d_%H:%M"))
+                    fn = "models/metamodel-{}.ckpt".format(datetime.datetime.now().strftime("%m-%d_%Hh%M"))
                     saver.save(sesh, fn)
                     print "model saved at: {}".format(fn)
 
                     rnn.print_score(sesh, config, test, dataset, mode="test")
+                sys.exit(0)
