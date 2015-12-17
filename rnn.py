@@ -1,6 +1,82 @@
 import tensorflow as tf
 import numpy as np
 from layers import LSTM, FullyConnected
+import random
+
+def print_score(sesh, config, graph, dataset, mode="valid", n_to_print=20):
+    costs = []
+    ins = []
+    outs = []
+    state = np.zeros([1, get_state_size(config)])
+
+    for i, (x, y) in enumerate(dataset.yield_examples(dataset=mode)):
+        if i < n_to_print:
+            state, out, cost = sesh.run([graph['states_out'], graph['y_out'], graph['cost']],
+                                    feed_dict={ graph['x_in']:x,
+                                                graph['states_in']:state,
+                                                graph['y_in']:y })
+            ins.append(x[0])
+            outs.append(out[0])
+        else:
+            state, cost = sesh.run([graph['states_out'], graph['cost']],
+                                    feed_dict={ graph['x_in']:x,
+                                                graph['states_in']:state,
+                                                graph['y_in']:y })
+        costs.append(cost)
+
+    if n_to_print:
+        dataset.print_model_output(ins, outs)
+
+    print "{} avg cost:\t{}".format(mode, np.mean(costs))
+
+
+def riff(fn, config, dataset):#, n_examples=50):
+    starter_char, x_idx = random.choice(dataset.char_idx_map.items())
+    # TODO: random sample of numpy array with dimension for n_examples of starting seeds, analogous to batch size ?
+    print u"\nriffing on '{}'...\n".format(starter_char)
+
+    graph = build_graph(config)
+    r = graph['test']
+    #with tf.Session() as sesh:
+        #sesh.run(tf.initialize_all_variables)
+
+    saver = tf.train.Saver()
+
+    with tf.Session() as sesh:
+        saver.restore(sesh, fn)
+        print "RESTORED!"
+        # TODO: necessary ???
+        # TODO: config for n_steps = 1, batch size, etc ?
+        #r = graph['riff']
+
+        # TODO: dim 1 = n_examples ?
+        riff_state = np.zeros([1, get_state_size(config)])
+        generated = [starter_char]
+        try:
+            while True:
+                x = np.eye(dataset.n_chars+2)[x_idx]
+                print dataset.idx_to_one_hot(x_idx)
+                outputs, riff_state = sesh.run( [r['y_out'], r['states_out']],
+                                        feed_dict={r['x_in']:np.array([x]),
+                                                    r['states_in']:riff_state} )
+
+                #TODO: sample with temperature ?
+                # idx corresponding to random choice sampled based on probabilities from model output
+                probs = outputs[0]
+                x_idx = int(np.random.choice(range(len(probs)), p=probs))
+                try:
+                    x_str = dataset.convert(x_idx)
+                except(KeyError):
+                    print 'Out of range of char idxs, yo!!'
+                    continue
+                generated.append(x_str)
+                print u"chosen (prob): '{0}' ({1:.3f})".format(x_str, probs[x_idx])\
+                                                       .replace("\n", "\\n")
+
+        except KeyboardInterrupt:
+            print '\nRIFFED...\n'
+            print u''.join(char for char in generated)
+
 
 def get_state_size(config):
     size = 0
@@ -10,16 +86,16 @@ def get_state_size(config):
 
     return size
 
+
 def cross_entropy(observed, actual):
     # bound values by clipping to avoid nan
-    return -tf.reduce_sum(actual*tf.log(tf.clip_by_value(observed,1e-10,1.0)))
+    return -tf.reduce_mean(actual*tf.log(tf.clip_by_value(observed,1e-10,1.0)))
+
 
 def build_graph(config):
      ######################################
     # PREPARE VARIABLES & HYPERPARAMETERS
     total_state_size = get_state_size(config)
-
-    print 'total_state_size', total_state_size
 
     batch_size = config['training']['batch_size']
     n_steps = config['training']['n_steps']
