@@ -52,7 +52,7 @@ def riff(fn, config, dataset):#, n_examples=50):
         generated = [starter_char]
         try:
             while True:
-                x = np.eye(dataset.n_chars+2)[x_idx]
+                x = np.eye(dataset.n_chars)[x_idx]
                 outputs, riff_state = sesh.run( [r['y_out'], r['states_out']],
                                         feed_dict={r['x_in']:np.array([x]),
                                                     r['states_in']:riff_state} )
