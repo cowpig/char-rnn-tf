@@ -49,13 +49,13 @@ class DataSet(object):
 
     def idx_to_one_hot(self, idx):
         """Takes in int or list of ints corresponding to indices in character map and returns corresponding one-hot vector or list of vectors"""
-        if type(idx) is int or np.int64 or np.int32:
+        if isinstance(idx,  (int, np.int64, np.int32)):
             return np.eye(self.n_chars)[self.data[idx]]
         return [np.eye(self.n_chars)[i] for i in idx]
 
     def convert(self, idx):
         """Takes in int or list of ints corresponding to indices in character map and returns corresponding char or list of chars"""
-        if type(idx) is int or np.int64 or np.int32:
+        if isinstance(idx,  (int, np.int64, np.int32)):
             return self.idx_to_char_map[idx]
         return [self.idx_to_char_map[i] for i in idx]
 
@@ -68,8 +68,7 @@ class DataSet(object):
         return sum(self.reverser * data)
 
     def print_model_output(self, inputs, outputs):
-        readable_x = u''.join(self.convert(
-              self.data_to_ords(inputs)))
+        readable_x = u''.join(self.convert(self.data_to_ords(inputs)))
 
         def prettify(pair):
             prob_str = "{:0.3f}".format(np.round(pair[1],3))

@@ -19,7 +19,8 @@ if __name__ == "__main__":
 
 
     dataset = data.DataSet('./data/edgar.txt',decoding_fx=data.decode_encoding)
-    conf = config.get_config(dataset.n_chars)
+    config_name = "single_lstm_flat"
+    conf = config.get_config(dataset.n_chars, config_name)
 
     graph = rnn.build_graph(conf)
 
@@ -32,7 +33,7 @@ if __name__ == "__main__":
 
         t = graph['train']
         test = graph['test']
-        train_state = np.zeros([batch_size, rnn.get_state_size(conf)])
+        train_state = np.zeros([conf['training']['batch_size'], rnn.get_state_size(conf)])
 
         cost = np.inf
         itr=0
@@ -43,7 +44,7 @@ if __name__ == "__main__":
         while True:
             try:
                 train_costs = []
-                for step, (x,y) in enumerate(dataset.yield_examples(steps=n_steps)):
+                for step, (x,y) in enumerate(dataset.yield_examples(steps=conf['training']['n_steps'])):
                     train_state, cost, _ = sesh.run([t['states_out'], t['cost'], t['train_op']],
                                                   feed_dict={t['x_in']:np.array([x]),
                                                             t['y_in']:np.array([y]),
@@ -66,7 +67,7 @@ if __name__ == "__main__":
                 import datetime
                 q = raw_input("Type 'Y' or 'y' to see save model & see test score:\n")
                 if q.lower() == 'y':
-                    fn = "models/metamodel-{}.ckpt".format(datetime.datetime.now().strftime("%m-%d_%Hh%M"))
+                    fn = "models/{}-{}.ckpt".format(config_name, datetime.datetime.now().strftime("%m-%d_%Hh%M"))
                     saver.save(sesh, fn)
                     print "model saved at: {}".format(fn)
 

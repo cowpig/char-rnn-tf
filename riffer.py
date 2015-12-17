@@ -11,7 +11,8 @@ if __name__ == "__main__":
 
 
     dataset = data.DataSet('./data/edgar.txt',decoding_fx=data.decode_encoding)
-    conf = config.get_config(dataset.n_chars)
+    config_name = "single_lstm_flat"
+    conf = config.get_config(dataset.n_chars, config_name)
     # dataset.idx['train'] = (0,320)
 
     rnn.riff(fn, conf, dataset)
