@@ -5,7 +5,6 @@ import numpy as np
 from layers import LSTM, FullyConnected
 import sys
 import os.path
-import random
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
