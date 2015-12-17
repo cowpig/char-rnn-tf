@@ -5,6 +5,7 @@ import numpy as np
 from layers import LSTM, FullyConnected
 import sys
 import os.path
+import random
 
 def score(sesh, config, graph, dataset, mode="valid", n_examples=50):
     costs = []
@@ -20,41 +21,38 @@ def score(sesh, config, graph, dataset, mode="valid", n_examples=50):
 
 
 
-def generate_text(sesh, config, graph, dataset, mode="valid", n_examples=50):
-    test_cost = 0
-    test_state = np.zeros([1, rnn.get_state_size(config)])
-    print "testing..."
-    inputs = []
-    outputs = []
-    for _ in xrange(30):
-        x, y = testing_generator.next()
-        inputs.append(x[:])
-        test_state, x, cost = sesh.run([test['states_out'],
-                                          test['y_out'],
-                                          test['cost']],
-                                        feed_dict={
-                                            test['x_in']:x,
-                                            test['states_in']:test_state,
-                                            test['y_in']:y})
-        test_cost += cost
-        outputs.append(x[0][:])
+#def generate_text(fn, config, dataset, n_examples=50):
+def riff(fn, config, dataset):#, n_examples=50):
+    starter_char, x = random.sample(dataset.char_idx_map.items(), 1)
+    # TODO: random sample of numpy array with dimension for n_examples of starting seeds, analogous to batch size ?
+    print "riffing on {}...".format(starter_char)
 
-        print "Test cost: ", test_cost
+    with tf.Session() as sesh:
+        saver.restore(sesh, fn)
 
-        readable_x = u''.join(dataset.convert(
-              dataset.data_to_ords(inputs)))
-        print "input: ", readable_x
+        # TODO: necessary ???
+        # TODO: config for n_steps = 1, batch size, etc ?
+        #r = graph['riff']
 
-        indexed_probs = [sorted([idxed for idxed in enumerate(letter)],
-                                  key=lambda x: x[1], reverse=True)
-                          for letter in outputs]
-        top_5_idxs = [i[:5] for i in indexed_probs]
+        # TODO: dim 1 = n_examples ?
+        riff_state = np.zeros([1, rnn.get_state_size(config)])
+        generated = [x[:]]
 
-        for char, top5 in zip(readable_x, top_5_idxs):
-            print "'",char,"'"
-            top_out = [u"{0}: {1:.3f}".format(dataset.convert(l[0]), l[1])
-                        for l in top5]
-            print u"\t", u" | ".join(top_out).replace("\n", "\\n")
+        while True:
+            try:
+                outputs, riff_state = sesh.run( [r['y_out'], r['states_out']],
+                                        feed_dict={r['x_in']:np.array([x]),
+                                                    r['states_in']:riff_state} )
+
+                #TODO: sample with temperature ?
+                x = np.random.choice(range(len(outputs)), p=outputs)
+                generated.append(x[:])
+
+                print u'chosen (prob): {0}: {1:.3f}'.format(dataset.convert(x), probs[x])\
+                                                    .replace("\n", "\\n")
+
+            except KeyboardInterrupt:
+                print ''.join(dataset.convert(char) for char in generated)
 
 
 if __name__ == "__main__":
@@ -122,7 +120,7 @@ if __name__ == "__main__":
         saver = tf.train.Saver()
         if fn:
             saver.restore(sesh, fn)
-        
+
         t = graph['train']
         test = graph['test']
         train_state = np.zeros([batch_size, rnn.get_state_size(config)])
@@ -136,7 +134,7 @@ if __name__ == "__main__":
         while True:
             try:
                 for t, (x,y) in enumerate(dataset.yield_examples(steps=n_steps)):
-                    train_costs = 
+                    train_costs =
                     train_state, cost, _ = sesh.run([t['states_out'], t['cost'], t['train_op']],
                                                   feed_dict={t['x_in']:np.array([x]),
                                                             t['y_in']:np.array([y]),
