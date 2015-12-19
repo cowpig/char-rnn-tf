@@ -18,8 +18,8 @@ if __name__ == "__main__":
             raise Exception("File '{}' does not exist.".format(fn))
 
 
-    dataset = data.DataSet('./data/edgar.txt',decoding_fx=data.decode_encoding)
-    config_name = "single_lstm_flat"
+    dataset = data.DataSet('./data/dum.txt',decoding_fx=lambda x: x)
+    config_name = "test_lstm_no_embedding"
     conf = config.get_config(dataset.n_chars, config_name)
 
     graph = rnn.build_graph(conf)
@@ -50,7 +50,7 @@ if __name__ == "__main__":
                                                             t['y_in']:np.array([y]),
                                                             t['states_in']:train_state})
                     train_costs.append(cost)
-                    # if step % 200 == 0:
+                    # if step % 10000 == 0:
                     #     print "\ttraining cost at epoch {} step {}:\t{}".format(itr, step, cost)
 
                 print "Avg cost for training epoch {}: {}".format(itr, np.mean(train_costs))
@@ -61,7 +61,6 @@ if __name__ == "__main__":
                     rnn.print_score(sesh, conf, test, dataset, mode="valid", n_to_print=0)
 
 
-                itr+=1
 
             except KeyboardInterrupt:
                 import datetime
@@ -73,3 +72,5 @@ if __name__ == "__main__":
 
                     rnn.print_score(sesh, conf, test, dataset, mode="test")
                 sys.exit(0)
+                
+            itr+=1
